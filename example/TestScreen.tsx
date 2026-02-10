@@ -1,7 +1,6 @@
 import SecureSigning from "expo-secure-signing";
 import { useState } from "react";
 import { Button, ScrollView, Text, TextInput, View } from "react-native";
-import { base64ToPem } from "./utils";
 
 export default function TestScreen() {
   const [alias, setAlias] = useState<string>("key-pair-alias");
@@ -59,7 +58,9 @@ export default function TestScreen() {
         <Button
           onPress={() =>
             setRetrievedPublicKey(
-              SecureSigning.getPublicKey(retrieveAlias) ?? ""
+              SecureSigning.getPublicKey(retrieveAlias, {
+                format: 'PEM',
+              }) ?? ""
             )
           }
           title="Get Public Key"

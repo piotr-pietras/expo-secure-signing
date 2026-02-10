@@ -38,9 +38,11 @@ if (res === GenerateKeyPairResult.NOT_AVAILABLE) {
   throw new Error("Secure signing is not available on this device.");
 }
 
-// 2) Export the public key (Base64 DER SubjectPublicKeyInfo)
-const publicKeyBase64 = SecureSigning.getPublicKey(alias);
-if (!publicKeyBase64) throw new Error("Missing key");
+// 2) Export the public key
+// - Default: Base64 of DER SubjectPublicKeyInfo (SPKI)
+// - Optional: PEM (-----BEGIN PUBLIC KEY----- ...), wrapped at 64 chars/line
+const publicKey = SecureSigning.getPublicKey(alias, { format: "PEM" });
+if (!publicKey) throw new Error("Missing key");
 
 // 3) Sign and verify (signature is Base64-encoded DER ECDSA signature)
 const message = "hello";
@@ -65,12 +67,9 @@ Creates a new **ECDSA P‑256** key pair for the given `alias`, if it doesn’t 
   - `GenerateKeyPairResult.KEY_PAIR_ALREADY_EXISTS`
   - `GenerateKeyPairResult.NOT_AVAILABLE` (e.g. secure hardware / keystore APIs not available)
 
-### `getPublicKey(alias: string): string | null`
+### `getPublicKey(alias: string, options?: { format?: "DER" | "PEM" }): string | null`
 
 Returns the public key for `alias`, or `null` if the key doesn’t exist.
-
-- **Format**: Base64 of DER-encoded **SubjectPublicKeyInfo (SPKI)** for P‑256.
-  - You can wrap it into PEM on the JS side if needed.
 
 ### `removeKeyPair(alias: string): boolean`
 

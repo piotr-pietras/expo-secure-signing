@@ -1,6 +1,6 @@
 {
   "name": "expo-secure-signing",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Secure signing for Expo using device hardware capabilities",
   "main": "build/index.js",
   "types": "build/index.d.ts",
@@ -19,7 +19,14 @@
     "react-native",
     "expo",
     "secure-signing",
-    "SecureSigning"
+    "signature",
+    "ecdsa",
+    "p256",
+    "android-keystore",
+    "secure-enclave",
+    "hardware-backed",
+    "keychain",
+    "keystore"
   ],
   "repository": "https://github.com/piotr-pietras/expo-secure-signing",
   "bugs": {

@@ -1,11 +1,17 @@
 import ExpoModulesCore
 import Security
 import Foundation
+import LocalAuthentication
 
 enum SecureSigningModuleResult: String {
   case KEY_PAIR_GENERATED = "KEY_PAIR_GENERATED"
   case KEY_PAIR_ALREADY_EXISTS = "KEY_PAIR_ALREADY_EXISTS"
   case NOT_AVAILABLE = "NOT_AVAILABLE"
+}
+
+enum SignMethod: String {
+  case PASSCODE = "PASSCODE"
+  case PASSCODE_OR_BIOMETRIC = "PASSCODE_OR_BIOMETRIC"
 }
 
 public class SecureSigningModule: Module {
@@ -25,6 +31,11 @@ public class SecureSigningModule: Module {
       0x03, 0x42, 0x00
     ])
     return prefix + raw
+  }
+
+  private func isAuthCheckAvailable() -> Bool {
+    let context = LAContext()
+    return context.canEvaluatePolicy(.deviceOwnerAuthentication, error: nil)
   }
 
   private func getAliases() -> [String] {
@@ -85,16 +96,45 @@ public class SecureSigningModule: Module {
 
     Name("SecureSigning")
 
-    Function("generateKeyPair") { (alias: String) -> String in
+    Function("isAuthCheckAvailable") { () -> Bool in
+      return self.isAuthCheckAvailable()
+    }
+
+    Function("generateKeyPair") { (alias: String, o: [String: Any]) -> String in
+      let reqAuth = o["reqAuth"] as! Bool
+      let authMethod = SignMethod(rawValue: o["authMethod"] as! String)
+
+      if reqAuth && !self.isAuthCheckAvailable() {
+        throw NSError(
+          domain: "SecureSigning",
+          code: 1,
+          userInfo: [NSLocalizedDescriptionKey: "NO_AUTH_AVAILABLE"]
+        )
+      }
+
       let secKey = self.getSecKeyByAlias(alias)
       if secKey != nil {
         return SecureSigningModuleResult.KEY_PAIR_ALREADY_EXISTS.rawValue
       }
 
+      let accessFlags: SecAccessControlCreateFlags
+      if reqAuth {
+        switch authMethod {
+          case .PASSCODE:
+            accessFlags = [.privateKeyUsage, .devicePasscode]
+          case .PASSCODE_OR_BIOMETRIC:
+            accessFlags = [.privateKeyUsage, .userPresence]
+          default:
+            accessFlags = .privateKeyUsage
+        }
+      } else {
+        accessFlags = .privateKeyUsage
+      }
+
       guard let access = SecAccessControlCreateWithFlags(
         kCFAllocatorDefault,
-        kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
-        .privateKeyUsage,
+        kSecAttrAccessibleWhenUnlocked,
+        accessFlags,
         nil
       ) else {
         return SecureSigningModuleResult.NOT_AVAILABLE.rawValue
@@ -129,16 +169,21 @@ public class SecureSigningModule: Module {
       return self.retrievePublicKey(secKey)
     }
 
-    Function("sign") { (alias: String, data: String) -> String? in
+    AsyncFunction("sign") { (alias: String, data: String, o: [String: Any]) -> String? in
       let secKey = self.getSecKeyByAlias(alias)
       guard let secKey else { return nil }
 
+      var signingError: Unmanaged<CFError>?
       let signatureCF = SecKeyCreateSignature(
         secKey,
         .ecdsaSignatureMessageX962SHA256,
         Data(data.utf8) as CFData,
-        nil
+        &signingError
       )
+
+      if let error = signingError?.takeRetainedValue() {
+        throw error as Error
+      }
 
       guard let signatureCF else { return nil }
       let signature = signatureCF as Data

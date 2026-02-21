@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "crypto-hardware-example",
-    "slug": "crypto-hardware-example",
+    "name": "expo-secure-signing-example",
+    "slug": "expo-secure-signing-example",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -14,7 +14,10 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "expo.modules.cryptohardware.example"
+      "bundleIdentifier": "expo.modules.securesigning.example",
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "We use Face ID to secure your data."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -23,7 +26,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "expo.modules.cryptohardware.example"
+      "package": "expo.modules.securesigning.example"
     }
   }
 }

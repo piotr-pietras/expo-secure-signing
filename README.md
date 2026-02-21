@@ -2,7 +2,8 @@
 
 > ⚠️ Please note that the module is currently in beta and is not suitable for production.
 
-Secure, device-backed **ECDSA P‑256 signing** for Expo / React Native apps.
+Secure, easy to audit, device-backed **ECDSA P‑256 signing** for Expo / React Native apps.
+Also integrates with system biometric authentication and device passcode.
 
 This module stores private keys in the platform’s protected key storage:
 
@@ -25,15 +26,19 @@ Install the package in your app:
 npx expo install expo-secure-signing
 ```
 
-## Usage
+## Usage **without** biometric/passcode authentication
 
 ```ts
-import SecureSigning, { GenerateKeyPairResult } from "expo-secure-signing";
+import SecureSigning, {
+  AuthCheckResult,
+  GenerateKeyPairResult,
+  SignMethod,
+} from "expo-secure-signing";
 
 const alias = "my-key";
 
 // 1) Create (or reuse) a device-backed P‑256 key pair
-const res = SecureSigning.generateKeyPair(alias);
+const res = await SecureSigning.generateKeyPair(alias);
 if (res === GenerateKeyPairResult.NOT_AVAILABLE) {
   throw new Error("Secure signing is not available on this device.");
 }
@@ -46,8 +51,60 @@ if (!publicKey) throw new Error("Missing key");
 
 // 3) Sign and verify (signature is Base64-encoded DER ECDSA signature)
 const message = "hello";
-const signatureBase64 = SecureSigning.sign(alias, message);
+const signatureBase64 = await SecureSigning.sign(alias, message);
+if (!signatureBase64) throw new Error("Signing failed");
 const ok = SecureSigning.verify(alias, message, signatureBase64);
+```
+
+## Usage **with** biometric/passcode authentication
+
+```ts
+import SecureSigning, {
+  AuthCheckResult,
+  GenerateKeyPairResult,
+  SignMethod,
+} from "expo-secure-signing";
+
+const alias = "my-auth-key";
+
+// 1) Optional but recommended: check auth capability first
+const authStatus = SecureSigning.isAuthCheckAvailable();
+if (authStatus !== AuthCheckResult.AVAILABLE) {
+  throw new Error(`Authentication not available: ${authStatus}`);
+}
+
+// 2) Export the public key
+const created = await SecureSigning.generateKeyPair(alias, {
+  requireAuthentication: true,
+  // iOS: choose auth method when generating the key.
+  authMethod: SignMethod.PASSCODE_OR_BIOMETRIC,
+});
+
+if (
+  created === GenerateKeyPairResult.NOT_AVAILABLE
+) {
+  throw new Error("Secure signing is not available on this device.");
+}
+
+// 3) Sign and verify with passcode/biometric prompt
+const signature = await SecureSigning.sign(alias, "sensitive payload", {
+  // Android: choose auth method and optional prompt text when signing.
+  authMethod: SignMethod.PASSCODE_OR_BIOMETRIC,
+  promptTitle: "Sign message",
+  promptSubtitle: "Authenticate to continue",
+});
+```
+
+If you want to allow Face ID on iOS, add `NSFaceIDUsageDescription` in your app config:
+
+```json
+{
+  "ios": {
+    "infoPlist": {
+      "NSFaceIDUsageDescription": "We use Face ID to secure your data."
+    }
+  }
+}
 ```
 
 ## API (all exposed functions)
@@ -58,7 +115,16 @@ The default export is the native module instance:
 import SecureSigning from "expo-secure-signing";
 ```
 
-### `generateKeyPair(alias: string): GenerateKeyPairResult`
+### `isAuthCheckAvailable(): AuthCheckResult`
+
+Checks if biometric/passcode authentication is available on the current device.
+
+- **Returns**:
+  - `AuthCheckResult.AVAILABLE`
+  - `AuthCheckResult.NO_HARDWARE`
+  - `AuthCheckResult.UNAVAILABLE`
+
+### `generateKeyPair(alias: string, options?: GenerateKeyPairOptions): Promise<GenerateKeyPairResult>`
 
 Creates a new **ECDSA P‑256** key pair for the given `alias`, if it doesn’t already exist.
 
@@ -66,6 +132,10 @@ Creates a new **ECDSA P‑256** key pair for the given `alias`, if it doesn’t 
   - `GenerateKeyPairResult.KEY_PAIR_GENERATED`
   - `GenerateKeyPairResult.KEY_PAIR_ALREADY_EXISTS`
   - `GenerateKeyPairResult.NOT_AVAILABLE` (e.g. secure hardware / keystore APIs not available)
+
+- **Options**:
+  - `requireAuthentication?: boolean` (default: `false`)
+  - `authMethod?: SignMethod` (default: `SignMethod.PASSCODE_OR_BIOMETRIC`, iOS)
 
 ### `getPublicKey(alias: string, options?: { format?: "DER" | "PEM" }): string | null`
 
@@ -81,13 +151,18 @@ Deletes the key pair for `alias`.
 
 Lists aliases currently stored by the platform keystore/keychain for this key type.
 
-### `sign(alias: string, data: string): string`
+### `sign(alias: string, data: string, options?: SignOptions): Promise<string | null>`
 
 Signs `data` with the private key stored under `alias`.
 
 - **Algorithm**: ECDSA P‑256 with SHA‑256 (`SHA256withECDSA`)
 - **Input**: `data` is treated as a UTF‑8 string message
-- **Returns**: Base64 of the DER/X9.62 encoded ECDSA signature
+- **Returns**: Base64 of the DER/X9.62 encoded ECDSA signature, or `null` if key is missing
+
+- **Options**:
+  - `promptTitle?: string` (default: `"Unlock"`, Android)
+  - `promptSubtitle?: string` (default: `"Enter your PIN to continue"`, Android)
+  - `authMethod?: SignMethod` (default: `SignMethod.PASSCODE_OR_BIOMETRIC`, Android)
 
 If the key doesn’t exist, native code returns `null` (which may surface as a runtime error in JS). Ensure you call `generateKeyPair()` first and/or check `getPublicKey()` before signing.
 

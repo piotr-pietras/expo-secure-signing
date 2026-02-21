@@ -1,8 +1,12 @@
 import { NativeModule, requireNativeModule } from "expo";
 
 import {
+  AuthCheckResult,
+  GenerateKeyPairOptions,
   GenerateKeyPairResult,
   GetPublicKeyOptions,
+  SignMethod,
+  SignOptions,
 } from "./SecureSigning.types";
 
 function base64ToPem(base64: string, label = "DATA") {
@@ -13,11 +17,16 @@ function base64ToPem(base64: string, label = "DATA") {
 }
 
 declare class SecureSigningModule extends NativeModule {
-  generateKeyPair(alias: string): GenerateKeyPairResult;
+  isAuthCheckAvailable(): AuthCheckResult;
+  generateKeyPair(alias: string, o: any): GenerateKeyPairResult;
   getPublicKey(alias: string): string | null;
   removeKeyPair(alias: string): boolean;
   aliases(): string[];
-  sign(alias: string, data: string): string;
+  sign(
+    alias: string,
+    data: string,
+    o: any,
+  ): Promise<string | null>;
   verify(alias: string, data: string, signature: string): boolean | null;
 }
 
@@ -25,11 +34,22 @@ const module = requireNativeModule<SecureSigningModule>("SecureSigning");
 
 export default {
   /**
+   * Checks if the biometric or passcode authentication is available.
+   * @returns The result of the operation.
+   */
+  isAuthCheckAvailable: module.isAuthCheckAvailable,
+  /**
    * Creates a new ECDSA P‑256 key pair for the given alias, if it doesn’t already exist.
    * @param alias - The alias to use for the key pair.
    * @returns The result of the operation.
    */
-  generateKeyPair: module.generateKeyPair,
+  generateKeyPair: async (alias: string, options?: GenerateKeyPairOptions) => {
+    const o = {
+      reqAuth: options?.requireAuthentication ?? false,
+      authMethod: options?.authMethod ?? SignMethod.PASSCODE_OR_BIOMETRIC,
+    };
+    return module.generateKeyPair(alias, o);
+  },
   /**
    * Returns the public key for the given alias.
    * @param alias - The alias to use for the key pair.
@@ -59,9 +79,17 @@ export default {
    * Signs the given data with the private key for the given alias.
    * @param alias - The alias to use for the key pair.
    * @param data - The data to sign.
+   * @param options - The options for the operation.
    * @returns The signature.
    */
-  sign: module.sign,
+  sign: async (alias: string, data: string, options?: SignOptions) => {
+    const o = {
+      title: options?.promptTitle ?? "Unlock",
+      subtitle: options?.promptSubtitle ?? "Enter your PIN to continue",
+      authMethod: options?.authMethod ?? SignMethod.PASSCODE_OR_BIOMETRIC,
+    };
+    return module.sign(alias, data, o);
+  },
   /**
    * Verifies the given data with the signature for the given alias.
    * @param alias - The alias to use for the key pair.

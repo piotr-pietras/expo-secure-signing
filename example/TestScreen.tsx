@@ -1,12 +1,22 @@
-import SecureSigning from "expo-secure-signing";
+import SecureSigning, { AuthCheckResult, SignMethod } from "expo-secure-signing";
 import { useState } from "react";
-import { Button, ScrollView, Text, TextInput, View } from "react-native";
+import {
+  Button,
+  ScrollView,
+  Switch,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 
 export default function TestScreen() {
+  const [authCheckAvailable, setAuthCheckAvailable] = useState<string>("");
+  const [requireAuthentication, setRequireAuthentication] =
+    useState<boolean>(false);
   const [alias, setAlias] = useState<string>("key-pair-alias");
   const [generated, setGenerated] = useState<string>("");
   const [textToSign, setTextToSign] = useState<string>("text to sign");
-  const [removeAlias, setRemoveAlias] = useState<string>("key-pair-alias");
+  const [removeAlias, setRemoveAlias] = useState<string>("Test");
   const [signature, setSignature] = useState<string>("");
   const [verified, setVerified] = useState<boolean>(false);
   const [retrieveAlias, setRetrieveAlias] = useState<string>("key-pair-alias");
@@ -14,7 +24,32 @@ export default function TestScreen() {
 
   return (
     <ScrollView style={styles.container}>
+      <Group name="Auth Check Available">
+        <Text
+          style={{
+            color:
+              authCheckAvailable === AuthCheckResult.AVAILABLE
+                ? "green"
+                : "red",
+          }}
+        >
+          {authCheckAvailable}
+        </Text>
+        <Button
+          onPress={() =>
+            setAuthCheckAvailable(SecureSigning.isAuthCheckAvailable())
+          }
+          title="Auth Check Available"
+        />
+      </Group>
       <Group name="Generate Key Pair (should return public key)">
+        <View>
+          <Text>Require Authentication</Text>
+          <Switch
+            value={requireAuthentication}
+            onValueChange={setRequireAuthentication}
+          />
+        </View>
         <TextInput
           style={styles.input}
           placeholder="Enter alias"
@@ -22,7 +57,14 @@ export default function TestScreen() {
           onChangeText={setAlias}
         />
         <Button
-          onPress={() => setGenerated(SecureSigning.generateKeyPair(alias))}
+          onPress={() =>
+            SecureSigning.generateKeyPair(alias, {
+              requireAuthentication,
+            })
+              .then((result) => {
+                setGenerated(result);
+              })
+          }
           title="Create Keys"
         />
         <Text style={{ color: generated ? "green" : "red" }}>{generated}</Text>
@@ -41,9 +83,7 @@ export default function TestScreen() {
         />
         <Button
           onPress={() => {
-            const newLocal = SecureSigning.removeKeyPair(removeAlias);
-            console.info(newLocal);
-            console.info(SecureSigning.aliases());
+            SecureSigning.removeKeyPair(removeAlias);
           }}
           title="Remove Key Pair"
         />
@@ -59,7 +99,7 @@ export default function TestScreen() {
           onPress={() =>
             setRetrievedPublicKey(
               SecureSigning.getPublicKey(retrieveAlias, {
-                format: 'PEM',
+                format: "PEM",
               }) ?? ""
             )
           }
@@ -76,21 +116,31 @@ export default function TestScreen() {
         />
         <Button
           onPress={() => {
-            console.log(textToSign);
-            console.log(alias);
-            setSignature(SecureSigning.sign(alias, textToSign));
+            SecureSigning.sign(alias, textToSign, {
+              authMethod: SignMethod.PASSCODE_OR_BIOMETRIC,
+              promptTitle: "TEST",
+              promptSubtitle: "TEST",
+            })
+              .then((result) => {
+                setSignature(result ?? "");
+              })
+              .catch((error) => {
+                console.error(error);
+              });
           }}
           title="Sign"
         />
         <TextInput
-          style={styles.input}
+          style={[styles.input, { height: 100 }]}
           placeholder="Generated signature"
+          multiline={true}
+          numberOfLines={4}
           value={signature}
           onChangeText={setSignature}
         />
         {signature && (
           <>
-            <Button
+            {/* <Button
               onPress={() => {
                 console.info({});
 
@@ -110,7 +160,7 @@ export default function TestScreen() {
             />
             <Text style={{ color: verified ? "green" : "red" }}>
               {verified ? "Signature verified" : "Signature not verified!"}
-            </Text>
+            </Text> */}
           </>
         )}
       </Group>

@@ -1,7 +1,7 @@
 apply plugin: 'com.android.library'
 
 group = 'expo.modules.securesigning'
-version = '0.1.0'
+version = '0.3.0'
 
 def expoModulesCorePlugin = new File(project(":expo-modules-core").projectDir.absolutePath, "ExpoModulesCorePlugin.gradle")
 apply from: expoModulesCorePlugin
@@ -32,12 +32,16 @@ if (useManagedAndroidSdkVersions) {
 }
 
 android {
-  namespace "expo.modules.cryptohardware"
+  namespace "expo.modules.securesigning"
   defaultConfig {
     versionCode 1
-    versionName "0.1.0"
+    versionName "0.3.0"
   }
   lintOptions {
     abortOnError false
   }
+}
+
+dependencies {
+  implementation "androidx.biometric:biometric:1.1.0"
 }

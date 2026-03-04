@@ -26,13 +26,13 @@ Install the package in your app:
 npx expo install expo-secure-signing
 ```
 
-## Usage **without** biometric/passcode authentication
+## Usage **WITHOUT** biometric/passcode authentication
 
 ```ts
 import SecureSigning, {
   AuthCheckResult,
   GenerateKeyPairResult,
-  SignMethod,
+  AuthMethod,
 } from "expo-secure-signing";
 
 const alias = "my-key";
@@ -56,13 +56,13 @@ if (!signatureBase64) throw new Error("Signing failed");
 const ok = SecureSigning.verify(alias, message, signatureBase64);
 ```
 
-## Usage **with** biometric/passcode authentication
+## Usage **WITH** biometric/passcode authentication
 
 ```ts
 import SecureSigning, {
   AuthCheckResult,
   GenerateKeyPairResult,
-  SignMethod,
+  AuthMethod,
 } from "expo-secure-signing";
 
 const alias = "my-auth-key";
@@ -77,7 +77,7 @@ if (authStatus !== AuthCheckResult.AVAILABLE) {
 const created = await SecureSigning.generateKeyPair(alias, {
   requireAuthentication: true,
   // iOS: choose auth method when generating the key.
-  authMethod: SignMethod.PASSCODE_OR_BIOMETRIC,
+  authMethod: AuthMethod.PASSCODE_OR_BIOMETRIC,
 });
 
 if (
@@ -89,7 +89,7 @@ if (
 // 3) Sign and verify with passcode/biometric prompt
 const signature = await SecureSigning.sign(alias, "sensitive payload", {
   // Android: choose auth method and optional prompt text when signing.
-  authMethod: SignMethod.PASSCODE_OR_BIOMETRIC,
+  authMethod: AuthMethod.PASSCODE_OR_BIOMETRIC,
   promptTitle: "Sign message",
   promptSubtitle: "Authenticate to continue",
 });
@@ -135,7 +135,7 @@ Creates a new **ECDSA P‑256** key pair for the given `alias`, if it doesn’t 
 
 - **Options**:
   - `requireAuthentication?: boolean` (default: `false`)
-  - `authMethod?: SignMethod` (default: `SignMethod.PASSCODE_OR_BIOMETRIC`, iOS)
+  - `authMethod?: AuthMethod` (default: `AuthMethod.PASSCODE_OR_BIOMETRIC`, iOS)
 
 ### `getPublicKey(alias: string, options?: { format?: "DER" | "PEM" }): string | null`
 
@@ -162,7 +162,7 @@ Signs `data` with the private key stored under `alias`.
 - **Options**:
   - `promptTitle?: string` (default: `"Unlock"`, Android)
   - `promptSubtitle?: string` (default: `"Enter your PIN to continue"`, Android)
-  - `authMethod?: SignMethod` (default: `SignMethod.PASSCODE_OR_BIOMETRIC`, Android)
+  - `authMethod?: AuthMethod` (default: `AuthMethod.PASSCODE_OR_BIOMETRIC`, Android)
 
 If the key doesn’t exist, native code returns `null` (which may surface as a runtime error in JS). Ensure you call `generateKeyPair()` first and/or check `getPublicKey()` before signing.
 

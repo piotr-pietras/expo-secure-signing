@@ -10,7 +10,7 @@ export enum AuthCheckResult {
   UNAVAILABLE = "UNAVAILABLE",
 }
 
-export enum SignMethod {
+export enum AuthMethod {
   PASSCODE = "PASSCODE",
   PASSCODE_OR_BIOMETRIC = "PASSCODE_OR_BIOMETRIC",
 }
@@ -37,10 +37,10 @@ export interface GenerateKeyPairOptions {
    *   }
    * }
    * ```
-   * @default SignMethod.PASSCODE_OR_BIOMETRIC
+   * @default AuthMethod.PASSCODE_OR_BIOMETRIC
    * @platform ios
    */
-  authMethod?: SignMethod;
+  authMethod?: AuthMethod;
 }
 
 export interface SignOptions {
@@ -59,10 +59,10 @@ export interface SignOptions {
   /**
    * The method of authentication to use.
    * Note that on iOS you have to define it when generating the key pair.
-   * @default SignMethod.PASSCODE_OR_BIOMETRIC
+   * @default AuthMethod.PASSCODE_OR_BIOMETRIC
    * @platform android
    */
-  authMethod?: SignMethod;
+  authMethod?: AuthMethod;
 }
 export interface GetPublicKeyOptions {
   /**

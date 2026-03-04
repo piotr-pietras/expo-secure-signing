@@ -9,7 +9,7 @@ enum SecureSigningModuleResult: String {
   case NOT_AVAILABLE = "NOT_AVAILABLE"
 }
 
-enum SignMethod: String {
+enum AuthMethod: String {
   case PASSCODE = "PASSCODE"
   case PASSCODE_OR_BIOMETRIC = "PASSCODE_OR_BIOMETRIC"
 }
@@ -102,7 +102,7 @@ public class SecureSigningModule: Module {
 
     Function("generateKeyPair") { (alias: String, o: [String: Any]) -> String in
       let reqAuth = o["reqAuth"] as! Bool
-      let authMethod = SignMethod(rawValue: o["authMethod"] as! String)
+      let authMethod = AuthMethod(rawValue: o["authMethod"] as! String)
 
       if reqAuth && !self.isAuthCheckAvailable() {
         throw NSError(

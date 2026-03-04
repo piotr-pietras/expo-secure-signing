@@ -7,7 +7,7 @@ import {
   View,
 } from "react-native";
 import { Text } from "react-native";
-import SecureSigning, { SignMethod } from "expo-secure-signing";
+import SecureSigning, { AuthMethod } from "expo-secure-signing";
 
 export default function RecordScreen() {
   const [authCheckAvailable, setAuthCheckAvailable] = useState<string>("");
@@ -67,7 +67,7 @@ export default function RecordScreen() {
           <TouchableOpacity
             onPress={() => {
               SecureSigning.sign('Test', textToSign, {
-                authMethod: SignMethod.PASSCODE_OR_BIOMETRIC,
+                authMethod: AuthMethod.PASSCODE_OR_BIOMETRIC,
               }).then((result) => {
                 setSignature(result ?? "");
               })

@@ -5,7 +5,7 @@ import {
   GenerateKeyPairOptions,
   GenerateKeyPairResult,
   GetPublicKeyOptions,
-  SignMethod,
+  AuthMethod,
   SignOptions,
 } from "./SecureSigning.types";
 
@@ -46,7 +46,7 @@ export default {
   generateKeyPair: async (alias: string, options?: GenerateKeyPairOptions) => {
     const o = {
       reqAuth: options?.requireAuthentication ?? false,
-      authMethod: options?.authMethod ?? SignMethod.PASSCODE_OR_BIOMETRIC,
+      authMethod: options?.authMethod ?? AuthMethod.PASSCODE_OR_BIOMETRIC,
     };
     return module.generateKeyPair(alias, o);
   },
@@ -86,7 +86,7 @@ export default {
     const o = {
       title: options?.promptTitle ?? "Unlock",
       subtitle: options?.promptSubtitle ?? "Enter your PIN to continue",
-      authMethod: options?.authMethod ?? SignMethod.PASSCODE_OR_BIOMETRIC,
+      authMethod: options?.authMethod ?? AuthMethod.PASSCODE_OR_BIOMETRIC,
     };
     return module.sign(alias, data, o);
   },

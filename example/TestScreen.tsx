@@ -1,4 +1,4 @@
-import SecureSigning, { AuthCheckResult, SignMethod } from "expo-secure-signing";
+import SecureSigning, { AuthCheckResult, AuthMethod } from "expo-secure-signing";
 import { useState } from "react";
 import {
   Button,
@@ -117,7 +117,7 @@ export default function TestScreen() {
         <Button
           onPress={() => {
             SecureSigning.sign(alias, textToSign, {
-              authMethod: SignMethod.PASSCODE_OR_BIOMETRIC,
+              authMethod: AuthMethod.PASSCODE_OR_BIOMETRIC,
               promptTitle: "TEST",
               promptSubtitle: "TEST",
             })

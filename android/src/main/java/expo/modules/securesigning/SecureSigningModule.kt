@@ -33,7 +33,7 @@ enum class AuthCheckResult {
   NO_HARDWARE,
 }
 
-enum class SignMethod {
+enum class AuthMethod {
   PASSCODE,
   PASSCODE_OR_BIOMETRIC,
 }
@@ -101,7 +101,7 @@ class SecureSigningModule : Module() {
     onError: (String) -> Unit,
     title: String = "Unlock",
     subtitle: String = "Enter your PIN to continue",
-    authMethod: SignMethod
+    authMethod: AuthMethod
   ) {
     val activity = appContext.currentActivity as? FragmentActivity ?: run {
       onError("No active FragmentActivity found")
@@ -137,8 +137,8 @@ class SecureSigningModule : Module() {
         .setSubtitle(subtitle)
         .setAllowedAuthenticators(
           when (authMethod) {
-            SignMethod.PASSCODE -> BiometricManager.Authenticators.DEVICE_CREDENTIAL
-            SignMethod.PASSCODE_OR_BIOMETRIC -> BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
+            AuthMethod.PASSCODE -> BiometricManager.Authenticators.DEVICE_CREDENTIAL
+            AuthMethod.PASSCODE_OR_BIOMETRIC -> BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
           }
         )
         .build()
@@ -243,9 +243,9 @@ class SecureSigningModule : Module() {
           title = title,
           subtitle = subtitle,
           authMethod = when (authMethod) {
-            "PASSCODE" -> SignMethod.PASSCODE
-            "PASSCODE_OR_BIOMETRIC" -> SignMethod.PASSCODE_OR_BIOMETRIC
-            else -> SignMethod.PASSCODE_OR_BIOMETRIC
+            "PASSCODE" -> AuthMethod.PASSCODE
+            "PASSCODE_OR_BIOMETRIC" -> AuthMethod.PASSCODE_OR_BIOMETRIC
+            else -> AuthMethod.PASSCODE_OR_BIOMETRIC
           }
         )
       }

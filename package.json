@@ -16,19 +16,24 @@
     "open:android": "open -a \"Android Studio\" example/android"
   },
   "keywords": [
-    "react-native",
     "expo",
-    "device-crypto",
-    "device-cryptography",
-    "device",
+    "expo-module",
+    "react-native",
+    "native-module",
     "crypto",
-    "android-keystore",
+    "cryptography",
+    "device-crypto",
+    "hardware-backed",
     "secure-enclave",
+    "android-keystore",
+    "ios-keychain",
+    "key-management",
+    "secure-key-storage",
+    "digital-signature",
     "ecdsa",
     "secp256r1",
     "rsa",
-    "rsa-pkcs1",
-    "hardware-backed"
+    "rsa-pkcs1"
   ],
   "repository": "https://github.com/piotr-pietras/expo-device-crypto",
   "bugs": {

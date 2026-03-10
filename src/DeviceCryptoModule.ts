@@ -131,7 +131,7 @@ export default {
   /**
    * Signs the given data with the private key for the given alias.
    * @param alias - The alias to use for the key pair.
-   * @param data - The data to sign.
+   * @param data - The data to sign in UTF-8 format.
    * @param options - The options for the operation.
    * @default { 
    *  algoType: EncryptionAlgorithm.RSA_2048_PKCS1, 
@@ -147,7 +147,7 @@ export default {
   /**
    * Decrypts the given data with the private key for the given alias.
    * @param alias - The alias to use for the key pair.
-   * @param data - The data to decrypt.
+   * @param data - The data to decrypt in Base64 format.
    * @param options - The options for the operation.
    * @default { 
    *  algoType: EncryptionAlgorithm.RSA_2048_PKCS1, 

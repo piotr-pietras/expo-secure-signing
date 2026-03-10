@@ -113,6 +113,7 @@ public class DeviceCryptoModule: Module {
   private func getAliases() -> [String] {
     let query: [String: Any] = [
       kSecClass as String: kSecClassKey,
+      kSecAttrKeyClass as String: kSecAttrKeyClassPublic,
       kSecMatchLimit as String: kSecMatchLimitAll,
       kSecReturnAttributes as String: true,
     ]
@@ -131,16 +132,20 @@ public class DeviceCryptoModule: Module {
     }
   }
 
-  private func getSecKeyQuery(_ alias: String) -> [String: Any] {
-    return [
+  private func getSecKeyQuery(_ alias: String, keyClass: CFString, returnRef: Bool = true) -> [String: Any] {
+    var query: [String: Any] = [
       kSecClass as String: kSecClassKey,
       kSecAttrApplicationTag as String: alias,
-      kSecReturnRef as String: true,
+      kSecAttrKeyClass as String: keyClass,
     ]
+    if returnRef {
+      query[kSecReturnRef as String] = true
+    }
+    return query
   }
 
-  private func getSecKeyByAlias(_ alias: String) -> SecKey? {
-    let query: [String: Any] = self.getSecKeyQuery(alias)
+  private func getSecKeyByAlias(_ alias: String, keyClass: CFString) -> SecKey? {
+    let query: [String: Any] = self.getSecKeyQuery(alias, keyClass: keyClass)
     var item: CFTypeRef?
     let status = SecItemCopyMatching(query as CFDictionary, &item)
     guard status == errSecSuccess else { return nil }
@@ -172,12 +177,13 @@ public class DeviceCryptoModule: Module {
   }
 
   private func removeKeyStoreEntry(_ alias: String) -> Bool {
-    let secKey = self.getSecKeyByAlias(alias)
-    if secKey == nil { return false }
+    let privateQuery = self.getSecKeyQuery(alias, keyClass: kSecAttrKeyClassPrivate, returnRef: false)
+    let privateStatus = SecItemDelete(privateQuery as CFDictionary)
 
-    let query = self.getSecKeyQuery(alias)
-    let status = SecItemDelete(query as CFDictionary)
-    return status == errSecSuccess
+    let publicQuery = self.getSecKeyQuery(alias, keyClass: kSecAttrKeyClassPublic, returnRef: false)
+    let publicStatus = SecItemDelete(publicQuery as CFDictionary)
+
+    return privateStatus == errSecSuccess || publicStatus == errSecSuccess
   }
 
   private func buildECDSA_SECP256R1_SHA256(alias: String, reqAuth: Bool, authMethod: AuthMethod) -> SecKey? {
@@ -188,8 +194,6 @@ public class DeviceCryptoModule: Module {
           accessFlags = [.privateKeyUsage, .devicePasscode]
         case .PASSCODE_OR_BIOMETRIC:
           accessFlags = [.privateKeyUsage, .userPresence]
-        default:
-          accessFlags = .privateKeyUsage
       }
     } else {
       accessFlags = .privateKeyUsage
@@ -210,6 +214,10 @@ public class DeviceCryptoModule: Module {
           kSecAttrIsPermanent: true,
           kSecAttrApplicationTag: alias,
           kSecAttrAccessControl: access
+      ],
+      kSecPublicKeyAttrs: [
+          kSecAttrIsPermanent: true,
+          kSecAttrApplicationTag: alias
       ]
     ]
 
@@ -224,8 +232,6 @@ public class DeviceCryptoModule: Module {
           accessFlags = [.devicePasscode]
         case .PASSCODE_OR_BIOMETRIC:
           accessFlags = [.userPresence]
-        default:
-          accessFlags = []
       }
     } else {
       accessFlags = []
@@ -245,6 +251,10 @@ public class DeviceCryptoModule: Module {
           kSecAttrIsPermanent: true,
           kSecAttrApplicationTag: alias,
           kSecAttrAccessControl: access
+      ],
+      kSecPublicKeyAttrs: [
+          kSecAttrIsPermanent: true,
+          kSecAttrApplicationTag: alias
       ]
     ]
 
@@ -272,7 +282,7 @@ public class DeviceCryptoModule: Module {
         )
       }
 
-      let secKey = self.getSecKeyByAlias(alias)
+      let secKey = self.getSecKeyByAlias(alias, keyClass: kSecAttrKeyClassPrivate)
       if secKey != nil {
         return SecureSigningModuleResult.KEY_PAIR_ALREADY_EXISTS.rawValue
       }
@@ -302,13 +312,13 @@ public class DeviceCryptoModule: Module {
     }
 
     Function("getPublicKey") { (alias: String) -> String? in
-      let secKey = self.getSecKeyByAlias(alias)
+      let secKey = self.getSecKeyByAlias(alias, keyClass: kSecAttrKeyClassPublic)
       guard let secKey else { return nil }
       return self.retrievePublicKey(secKey)
     }
 
     AsyncFunction("sign") { (alias: String, data: String, o: [String: Any]) -> String? in
-      let secKey = self.getSecKeyByAlias(alias)
+      let secKey = self.getSecKeyByAlias(alias, keyClass: kSecAttrKeyClassPrivate)
       guard let secKey else { return nil }
 
       let algoType = AlgorithmType(rawValue: o["algoType"] as! String)
@@ -332,7 +342,7 @@ public class DeviceCryptoModule: Module {
     }
 
     Function("verify") { (alias: String, data: String, signature: String, o: [String: Any]) -> Bool? in
-      let secKey = self.getSecKeyByAlias(alias)
+      let secKey = self.getSecKeyByAlias(alias, keyClass: kSecAttrKeyClassPrivate)
       guard let secKey else { return nil }
 
       guard let publicKey = SecKeyCopyPublicKey(secKey) else { return nil }
@@ -352,7 +362,7 @@ public class DeviceCryptoModule: Module {
     }
 
     AsyncFunction("encrypt") { (alias: String, data: String, o: [String: Any]) -> String? in
-      let secKey = self.getSecKeyByAlias(alias)
+      let secKey = self.getSecKeyByAlias(alias, keyClass: kSecAttrKeyClassPublic)
       guard let secKey else { return nil }
       let publicKey = SecKeyCopyPublicKey(secKey)!
 
@@ -372,7 +382,7 @@ public class DeviceCryptoModule: Module {
     }
 
     AsyncFunction("decrypt") { (alias: String, data: String, o: [String: Any]) -> String? in
-      let secKey = self.getSecKeyByAlias(alias)
+      let secKey = self.getSecKeyByAlias(alias, keyClass: kSecAttrKeyClassPrivate)
       guard let secKey else { return nil }
       guard let encryptedData = Data(base64Encoded: data) else { return nil }
 

@@ -109,8 +109,8 @@ export default {
   /**
    * Verifies the given data with the signature for the given alias.
    * @param alias - The alias to use for the key pair.
-   * @param data - The data to verify.
-   * @param signature - The signature to verify.
+   * @param data - The data to verify in UTF-8 format.
+   * @param signature - The signature to verify in Base64 format.
    * @param options - The options for the operation.
    * @default { 
    *  algoType: SigningAlgorithm.ECDSA_SHA256, 
@@ -167,5 +167,3 @@ export default {
     return module.decrypt(alias, data, o);
   },
 };
-
-export type { GenerateKeyPairResult };

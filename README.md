@@ -2,7 +2,7 @@
 
 > ⚠️ This module is currently in beta and is not suitable for production use.
 
-🔒 Hardware-backed cryptography for Expo apps using [Android Keystore](https://developer.android.com/privacy-and-security/keystore) and Apple [Secure Enclave](https://developer.apple.com/documentation/security/protecting-keys-with-the-secure-enclave)/Keychain where available.
+🔒 Hardware-backed cryptography for Expo apps using [Android Keystore](https://developer.android.com/privacy-and-security/keystore) and Apple [Secure Enclave](https://developer.apple.com/documentation/security/protecting-keys-with-the-secure-enclave).
 
 ## Installation
 
@@ -41,6 +41,12 @@ If you want to allow Face ID on iOS, add this to your app config:
 **Key size:** 2048 bits. </br>
 **Padding:** PKCS#1 v1.5. </br>
 **Use it for:** Encrypting small secrets that only the private key holder should decrypt.
+
+- #### `RSA_2048_OAEP_SHA1`
+
+**Key size:** 2048 bits. </br>
+**Padding:** OAEP with SHA-1 and MGF1. </br>
+**Use it for:** Encrypting small secrets with stronger padding than PKCS#1 v1.5 when interoperating with OAEP SHA-1 systems.
 
 More coming soon 
 

@@ -23,6 +23,7 @@ enum AuthMethod: String {
 enum AlgorithmType: String {
   case ECDSA_SECP256R1_SHA256 = "ECDSA_SECP256R1_SHA256"
   case RSA_2048_PKCS1 = "RSA_2048_PKCS1"
+  case RSA_2048_OAEP_SHA1 = "RSA_2048_OAEP_SHA1"
 }
 
 public class DeviceCryptoModule: Module {
@@ -32,6 +33,8 @@ public class DeviceCryptoModule: Module {
       return .ecdsaSignatureMessageX962SHA256
     case .RSA_2048_PKCS1:
       return .rsaEncryptionPKCS1
+    case .RSA_2048_OAEP_SHA1:
+      return .rsaEncryptionOAEPSHA1
     }
   }
 
@@ -186,7 +189,7 @@ public class DeviceCryptoModule: Module {
     return privateStatus == errSecSuccess || publicStatus == errSecSuccess
   }
 
-  private func buildECDSA_SECP256R1_SHA256(alias: String, reqAuth: Bool, authMethod: AuthMethod) -> SecKey? {
+  private func buildECDSA(alias: String, reqAuth: Bool, authMethod: AuthMethod) -> SecKey? {
     let accessFlags: SecAccessControlCreateFlags
     if reqAuth {
       switch authMethod {
@@ -224,7 +227,7 @@ public class DeviceCryptoModule: Module {
     return SecKeyCreateRandomKey(attributes, nil)
   }
 
-  private func buildRSA_2048_PKCS1(alias: String, reqAuth: Bool, authMethod: AuthMethod) -> SecKey? {
+  private func buildRSA(alias: String, reqAuth: Bool, authMethod: AuthMethod) -> SecKey? {
     let accessFlags: SecAccessControlCreateFlags
     if reqAuth {
       switch authMethod {
@@ -289,9 +292,11 @@ public class DeviceCryptoModule: Module {
 
       switch algoType {
         case .ECDSA_SECP256R1_SHA256:
-          self.buildECDSA_SECP256R1_SHA256(alias: alias, reqAuth: reqAuth, authMethod: authMethod!)
+          self.buildECDSA(alias: alias, reqAuth: reqAuth, authMethod: authMethod!)
         case .RSA_2048_PKCS1:
-          self.buildRSA_2048_PKCS1(alias: alias, reqAuth: reqAuth, authMethod: authMethod!)
+          self.buildRSA(alias: alias, reqAuth: reqAuth, authMethod: authMethod!)
+        case .RSA_2048_OAEP_SHA1:
+          self.buildRSA(alias: alias, reqAuth: reqAuth, authMethod: authMethod!)
         default:
           throw NSError(
             domain: "DeviceCrypto",

@@ -1,3 +1,4 @@
+import { Picker } from "@react-native-picker/picker";
 import DeviceCrypto, {
   AuthCheckResult,
   AuthMethod,
@@ -11,7 +12,6 @@ import {
   Switch,
   Text,
   TextInput,
-  TouchableHighlight,
   View,
   Clipboard,
   TouchableOpacity,
@@ -67,18 +67,19 @@ export default function TestScreen() {
             onValueChange={setRequireAuthentication}
           />
         </View>
-        <View style={styles.inline}>
-          <Text>Key Type: {algoType}</Text>
-          <Switch
-            value={algoType === SigningAlgorithm.ECDSA_SECP256R1_SHA256}
-            onValueChange={() =>
-              setAlgoType(
-                algoType === SigningAlgorithm.ECDSA_SECP256R1_SHA256
-                  ? EncryptionAlgorithm.RSA_2048_OAEP_SHA1
-                  : SigningAlgorithm.ECDSA_SECP256R1_SHA256
-              )
+        <View>
+          <Text>Key Type: </Text>
+          <Picker
+            selectedValue={algoType}
+            onValueChange={(itemValue) =>
+              setAlgoType(itemValue as SigningAlgorithm | EncryptionAlgorithm)
             }
-          />
+          >
+            <Picker.Item label="ECDSA SECP256R1 SHA256" value={SigningAlgorithm.ECDSA_SECP256R1_SHA256} />
+            <Picker.Item label="RSA 2048 OAEP SHA1" value={EncryptionAlgorithm.RSA_2048_OAEP_SHA1} />
+            <Picker.Item label="RSA 2048 OAEP SHA256" value={EncryptionAlgorithm.RSA_2048_OAEP_SHA256} />
+            <Picker.Item label="RSA 2048 PKCS1" value={EncryptionAlgorithm.RSA_2048_PKCS1} />
+          </Picker>
         </View>
         <TextInput
           style={styles.input}
@@ -169,9 +170,9 @@ export default function TestScreen() {
           onChangeText={setSignature}
         />
         <Button
-          onPress={() => {
+          onPress={async () => {
             try {
-              const verified = DeviceCrypto.verify(
+              const verified = await DeviceCrypto.verify(
                 alias,
                 textToSign,
                 signature

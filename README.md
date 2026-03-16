@@ -2,7 +2,7 @@
 
 > ⚠️ This module is currently in beta and is not suitable for production use.
 
-🔒 Hardware-backed cryptography for Expo apps using [Android Keystore](https://developer.android.com/privacy-and-security/keystore) and Apple [Secure Enclave](https://developer.apple.com/documentation/security/protecting-keys-with-the-secure-enclave).
+🔒 Hardware-backed cryptography for Expo apps using [Android Keystore](https://developer.android.com/privacy-and-security/keystore) and Apple [Secure Enclave](https://developer.apple.com/documentation/security/protecting-keys-with-the-secure-enclave)/[Keychain](https://developer.apple.com/documentation/security/keychain-services).
 
 ## Installation
 
@@ -48,7 +48,7 @@ If you want to allow Face ID on iOS, add this to your app config:
 **Padding:** OAEP with SHA-1 and MGF1. </br>
 **Use it for:** Encrypting small secrets with stronger padding than PKCS#1 v1.5 when interoperating with OAEP SHA-1 systems.
 
-More coming soon 
+**More coming soon...**
 
 ## Example: ECDSA with Biometric
 
@@ -177,3 +177,9 @@ const decrypted = await DeviceCrypto.decrypt(alias, encrypted ?? "", {
   - Defaults: `algorithmType = RSA_2048_PKCS1`, `promptTitle = "Unlock"`, `promptSubtitle = "Enter your PIN to continue"`, `authMethod = PASSCODE_OR_BIOMETRIC`.
 
 > ✅ JSDoc type definitions are available in `./src/DeviceCryptoModule.ts`.
+
+## Important
+
+### RSA algorithms on iOS
+
+Please note that RSA private-key operations are not performed in the [Secure Enclave processor](https://developer.apple.com/documentation/security/ksecattrtokenidsecureenclave?utm_source=chatgpt.com#Discussion). Instead, they are software-backed and handled by Apple’s system cryptographic services, which still provide strong isolation and protection.

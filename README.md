@@ -2,7 +2,7 @@
 
 > ⚠️ This module is currently in beta and is not suitable for production use.
 
-🔒 Hardware-backed cryptography for Expo apps using [Android Keystore](https://developer.android.com/privacy-and-security/keystore) and Apple [Secure Enclave](https://developer.apple.com/documentation/security/protecting-keys-with-the-secure-enclave)/[Keychain](https://developer.apple.com/documentation/security/keychain-services).
+🔒 Hardware-backed cryptography for Expo apps using [Android Keystore](https://developer.android.com/privacy-and-security/keystore)/[Strong Box](https://developer.android.com/privacy-and-security/keystore#StrongBoxKeyMint) and Apple [Secure Enclave](https://developer.apple.com/documentation/security/protecting-keys-with-the-secure-enclave)/[Keychain](https://developer.apple.com/documentation/security/keychain-services).
 
 ## Installation
 
@@ -176,9 +176,34 @@ const decrypted = await DeviceCrypto.decrypt(alias, encrypted ?? "", {
   - Decrypts Base64 `data` with private key.
   - Defaults: `algorithmType = RSA_2048_PKCS1`, `promptTitle = "Unlock"`, `promptSubtitle = "Enter your PIN to continue"`, `authMethod = PASSCODE_OR_BIOMETRIC`.
 
+**Android only methods**
+
+- `isStrongBoxAvailable(): boolean`
+  - Returns `true` if StrongBox Keystore is supported on the device.
+
 > ✅ JSDoc type definitions are available in `./src/DeviceCryptoModule.ts`.
 
 ## Important
+
+### Enable Strong Box on Android
+
+Use `preferStrongBox: true` when generating a key pair to request [StrongBox-backed](https://developer.android.com/privacy-and-security/keystore#StrongBoxKeyMint) key storage when the device supports it.
+
+```ts
+import DeviceCrypto, { SigningAlgorithm } from "expo-device-crypto";
+
+const alias = "user-signing-key";
+
+// Optional: check availability first.
+const hasStrongBox = DeviceCrypto.isStrongBoxAvailable();
+
+await DeviceCrypto.generateKeyPair(alias, {
+  algorithmType: SigningAlgorithm.ECDSA_SECP256R1_SHA256,
+  preferStrongBox: true,
+});
+```
+
+If StrongBox is not available, Android falls back to the Trusted Execution Environment (TEE).
 
 ### RSA algorithms on iOS
 

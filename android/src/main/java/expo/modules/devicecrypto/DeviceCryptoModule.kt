@@ -109,7 +109,8 @@ class DeviceCryptoModule : Module() {
   private fun buildECDSA(
     alias: String, 
     digest: String,
-    reqAuth: Boolean): KeyPairGenerator {
+    reqAuth: Boolean,
+    strongBox: Boolean): KeyPairGenerator {
     val kpg: KeyPairGenerator = KeyPairGenerator.getInstance(
       KEY_ALGORITHM_EC,
       "AndroidKeyStore"
@@ -120,7 +121,7 @@ class DeviceCryptoModule : Module() {
       PURPOSE_SIGN or PURPOSE_VERIFY
     ).run {
       setDigests(digest)
-      setIsStrongBoxBacked(false) // TODO: Prefer strong box if available
+      setIsStrongBoxBacked(strongBox)
       setUserAuthenticationRequired(reqAuth)
       if (reqAuth) {
         setUserAuthenticationParameters(
@@ -138,7 +139,8 @@ class DeviceCryptoModule : Module() {
     alias: String, 
     digest: String?,
     padding: String,
-    reqAuth: Boolean): KeyPairGenerator {
+    reqAuth: Boolean,
+    strongBox: Boolean): KeyPairGenerator {
     val kpg: KeyPairGenerator = KeyPairGenerator.getInstance(
       KEY_ALGORITHM_RSA,
       "AndroidKeyStore"
@@ -152,7 +154,7 @@ class DeviceCryptoModule : Module() {
         setDigests(digest)
       }
       setEncryptionPaddings(padding)
-      setIsStrongBoxBacked(false) // TODO: Prefer strong box if available
+      setIsStrongBoxBacked(strongBox)
       setUserAuthenticationRequired(reqAuth)
       if (reqAuth) {
         setUserAuthenticationParameters(
@@ -241,10 +243,13 @@ class DeviceCryptoModule : Module() {
     }
 
     val algoType = AlgorithmType.valueOf(o["algoType"] as String)
+    val preferStrongBox = o["preferStrongBox"] as Boolean
+    val strongBox = preferStrongBox && isStrongBoxAvailable()
+
     val kpg = when (algoType) {
-      AlgorithmType.ECDSA_SECP256R1_SHA256 -> buildECDSA(alias, DIGEST_SHA256, reqAuth)
-      AlgorithmType.RSA_2048_PKCS1 -> buildRSA(alias, null, ENCRYPTION_PADDING_RSA_PKCS1, reqAuth)
-      AlgorithmType.RSA_2048_OAEP_SHA1 -> buildRSA(alias, DIGEST_SHA1, ENCRYPTION_PADDING_RSA_OAEP, reqAuth)
+      AlgorithmType.ECDSA_SECP256R1_SHA256 -> buildECDSA(alias, DIGEST_SHA256, reqAuth, strongBox)
+      AlgorithmType.RSA_2048_PKCS1 -> buildRSA(alias, null, ENCRYPTION_PADDING_RSA_PKCS1, reqAuth, strongBox)
+      AlgorithmType.RSA_2048_OAEP_SHA1 -> buildRSA(alias, DIGEST_SHA1, ENCRYPTION_PADDING_RSA_OAEP, reqAuth, strongBox)
       else -> throw Exception("INVALID_ALGORITHM_TYPE")
     }
 
@@ -409,6 +414,10 @@ class DeviceCryptoModule : Module() {
 
     Function("isAuthCheckAvailable") { ->
       return@Function isAuthCheckAvailable()
+    }
+
+    Function("isStrongBoxAvailable") { ->
+      return@Function isStrongBoxAvailable()
     }
 
     Function("generateKeyPair") { alias: String, o: Map<String, Any?> ->

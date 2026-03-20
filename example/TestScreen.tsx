@@ -19,6 +19,8 @@ import {
 
 export default function TestScreen() {
   const [authCheckAvailable, setAuthCheckAvailable] = useState<string>("");
+  const [strongBoxAvailable, setStrongBoxAvailable] = useState<boolean>(false);
+  const [preferStrongBox, setPreferStrongBox] = useState<boolean>(false);
   const [requireAuthentication, setRequireAuthentication] =
     useState<boolean>(false);
   const [removedCount, setRemovedCount] = useState<number>(0);
@@ -55,6 +57,19 @@ export default function TestScreen() {
           }
           title="Auth Check Available"
         />
+        <Text
+          style={{
+            color: strongBoxAvailable ? "green" : "red",
+          }}
+        >
+          {strongBoxAvailable ? "Available" : "Not Available"}
+        </Text>
+        <Button
+          onPress={() =>
+            setStrongBoxAvailable(DeviceCrypto.isStrongBoxAvailable())
+          }
+          title="Strong Box Available"
+        />
       </Group>
       <Group name="Generate Key Pair (should return public key)">
         {DeviceCrypto.aliases().map((alias) => (
@@ -67,6 +82,13 @@ export default function TestScreen() {
             onValueChange={setRequireAuthentication}
           />
         </View>
+        <View style={styles.inline}>
+          <Text>Prefer Strong Box</Text>
+          <Switch
+            value={preferStrongBox}
+            onValueChange={setPreferStrongBox}
+          />
+        </View>
         <View>
           <Text>Key Type: </Text>
           <Picker
@@ -77,7 +99,6 @@ export default function TestScreen() {
           >
             <Picker.Item label="ECDSA SECP256R1 SHA256" value={SigningAlgorithm.ECDSA_SECP256R1_SHA256} />
             <Picker.Item label="RSA 2048 OAEP SHA1" value={EncryptionAlgorithm.RSA_2048_OAEP_SHA1} />
-            <Picker.Item label="RSA 2048 OAEP SHA256" value={EncryptionAlgorithm.RSA_2048_OAEP_SHA256} />
             <Picker.Item label="RSA 2048 PKCS1" value={EncryptionAlgorithm.RSA_2048_PKCS1} />
           </Picker>
         </View>
@@ -99,6 +120,7 @@ export default function TestScreen() {
             DeviceCrypto.generateKeyPair(alias, {
               requireAuthentication,
               algorithmType: algoType,
+              preferStrongBox,
             })
               .then((result) => {
                 setGenerated(result);

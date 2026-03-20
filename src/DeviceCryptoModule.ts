@@ -23,6 +23,7 @@ function base64ToPem(base64: string, label = "DATA") {
 
 declare class DeviceCryptoModule extends NativeModule {
   isAuthCheckAvailable(): AuthCheckResult;
+  isStrongBoxAvailable(): boolean;
   generateKeyPair(alias: string, o: any): GenerateKeyPairResult;
   getPublicKey(alias: string): string | null;
   removeKeyPair(alias: string): boolean;
@@ -47,6 +48,12 @@ export default {
    */
   isAuthCheckAvailable: module.isAuthCheckAvailable,
   /**
+   * Checks if the strong box is available .
+   * @returns The result of the operation.
+   * @platform android 🤖
+   */
+  isStrongBoxAvailable: module.isStrongBoxAvailable,
+  /**
    * Creates a new ECDSA P‑256 key pair for the given alias, if it doesn’t already exist.
    * @param alias - The alias to use for the key pair.
    * @returns The result of the operation.
@@ -56,6 +63,7 @@ export default {
       algoType: options?.algorithmType,
       reqAuth: options?.requireAuthentication ?? false,
       authMethod: options?.authMethod ?? AuthMethod.PASSCODE_OR_BIOMETRIC,
+      preferStrongBox: options?.preferStrongBox ?? false,
     };
     return module.generateKeyPair(alias, o);
   },
@@ -89,12 +97,6 @@ export default {
    * @param alias - The alias to use for the key pair.
    * @param data - The data to sign.
    * @param options - The options for the operation.
-   * @default { 
-   *  algoType: SigningAlgorithm.ECDSA_SHA256, 
-   *  promptTitle: "Unlock", 
-   *  promptSubtitle: "Enter your PIN to continue", 
-   *  authMethod: AuthMethod.PASSCODE_OR_BIOMETRIC 
-   * }
    * @returns The signature.
    */
   sign: async (alias: string, data: string, options?: SignOptions) => {
@@ -112,9 +114,6 @@ export default {
    * @param data - The data to verify in UTF-8 format.
    * @param signature - The signature to verify in Base64 format.
    * @param options - The options for the operation.
-   * @default { 
-   *  algoType: SigningAlgorithm.ECDSA_SHA256, 
-   * }
    * @returns True if the signature is valid, false otherwise.
    */
   verify: async (
@@ -149,12 +148,6 @@ export default {
    * @param alias - The alias to use for the key pair.
    * @param data - The data to decrypt in Base64 format.
    * @param options - The options for the operation.
-   * @default { 
-   *  algoType: EncryptionAlgorithm.RSA_2048_PKCS1, 
-   *  promptTitle: "Unlock", 
-   *  promptSubtitle: "Enter your PIN to continue", 
-   *  authMethod: AuthMethod.PASSCODE_OR_BIOMETRIC 
-   * }
    * @returns The decrypted data.
    */
   decrypt: async (alias: string, data: string, options?: DecryptOptions) => {

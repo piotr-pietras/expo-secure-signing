@@ -51,29 +51,35 @@ export interface GenerateKeyPairOptions {
    * }
    * ```
    * @default AuthMethod.PASSCODE_OR_BIOMETRIC
-   * @platform ios
+   * @platform ios 🍏
    */
   authMethod?: AuthMethod;
+  /**
+   * If the Strong Box is available, it will be used instead of the Trusted Execution Environment (TEE).
+   * @default false
+   * @platform android 🤖
+   */
+  preferStrongBox?: boolean;
 }
 
 interface BaseSignDecryptOptions {
   /**
    * The title of the prompt to show when authentication is required.
    * @default "Unlock"
-   * @platform android
+   * @platform android 🤖
    */
   promptTitle?: string;
   /**
    * The subtitle of the prompt to show when authentication is required.
    * @default "Enter your PIN to continue"
-   * @platform android
+   * @platform android 🤖
    */
   promptSubtitle?: string;
   /**
    * The method of authentication to use.
    * Note that on iOS you have to define it when generating the key pair.
    * @default AuthMethod.PASSCODE_OR_BIOMETRIC
-   * @platform android
+   * @platform android 🤖
    */
   authMethod?: AuthMethod;
 }

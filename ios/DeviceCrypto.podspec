@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name           = 'DeviceCrypto'
-  s.version        = '0.2.1'
+  s.version        = '0.2.2'
   s.summary        = 'Device crypto'
   s.description    = 'Device crypto for Expo using device hardware capabilities'
   s.author         = 'Piotr Pietras'

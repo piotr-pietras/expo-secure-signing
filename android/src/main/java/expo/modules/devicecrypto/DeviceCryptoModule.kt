@@ -60,7 +60,33 @@ enum class AlgorithmType {
   RSA_2048_OAEP_SHA1,
 }
 
+enum class ReturnFormat {
+  BASE64,
+  HEX,
+}
+
 class DeviceCryptoModule : Module() {
+  private fun byteArrayToHex(bytes: ByteArray): String {
+    return bytes.joinToString("") { "%02x".format(it) }
+  }
+
+  private fun hexToByteArray(hex: String): ByteArray {
+    if (hex.length % 2 != 0) {
+      throw Exception("INVALID_INPUT_FORMAT")
+    }
+
+    val out = ByteArray(hex.length / 2)
+    for (i in out.indices) {
+      val hi = Character.digit(hex[i * 2], 16)
+      val lo = Character.digit(hex[(i * 2) + 1], 16)
+      if (hi == -1 || lo == -1) {
+        throw Exception("INVALID_INPUT_FORMAT")
+      }
+      out[i] = ((hi shl 4) + lo).toByte()
+    }
+    return out
+  }
+
   private fun toAndroidAlgo(algorithm: AlgorithmType): String {
     return when (algorithm) {
       AlgorithmType.ECDSA_SECP256R1_SHA256 -> "SHA256withECDSA"
@@ -291,6 +317,7 @@ class DeviceCryptoModule : Module() {
 
     val title = o["title"] as String
     val subtitle = o["subtitle"] as String
+    val format = ReturnFormat.valueOf(o["signatureFormat"] as String)
     val authMethod = AuthMethod.valueOf(o["authMethod"] as String)
     val algoType = AlgorithmType.valueOf(o["algoType"] as String)
     val algo = toAndroidAlgo(algoType)
@@ -300,7 +327,11 @@ class DeviceCryptoModule : Module() {
         initSign(entry.privateKey)
         update(data.toByteArray(Charsets.UTF_8))
       }.sign()
-      promise.resolve(Base64.encodeToString(signature, Base64.NO_WRAP))
+      promise.resolve(when (format) {
+        ReturnFormat.BASE64 -> Base64.encodeToString(signature, Base64.NO_WRAP)
+        ReturnFormat.HEX -> byteArrayToHex(signature)
+        else -> throw Exception("INVALID_OUTPUT_FORMAT")
+      })
       return
     } else {
       showAuthPrompt(
@@ -309,7 +340,11 @@ class DeviceCryptoModule : Module() {
             initSign(entry.privateKey)
             update(data.toByteArray(Charsets.UTF_8))
           }.sign()
-          promise.resolve(Base64.encodeToString(signature, Base64.NO_WRAP))
+          promise.resolve(when (format) {
+            ReturnFormat.BASE64 -> Base64.encodeToString(signature, Base64.NO_WRAP)
+            ReturnFormat.HEX -> byteArrayToHex(signature)
+            else -> throw Exception("INVALID_OUTPUT_FORMAT")
+          })
         },
         onError = { error ->
           promise.reject("ERR_AUTH_FAILED", error, null)
@@ -326,12 +361,17 @@ class DeviceCryptoModule : Module() {
     if (entry !is KeyStore.PrivateKeyEntry) return null
 
     val algoType = AlgorithmType.valueOf(o["algoType"] as String)
+    val format = ReturnFormat.valueOf(o["signatureFormat"] as String)
     val algo = toAndroidAlgo(algoType)
 
     val valid: Boolean = Signature.getInstance(algo).apply {
       initVerify(entry.certificate)
       update(data.toByteArray(Charsets.UTF_8))
-    }.verify(Base64.decode(signature, Base64.NO_WRAP))
+    }.verify(when (format) {
+      ReturnFormat.BASE64 -> Base64.decode(signature, Base64.NO_WRAP)
+      ReturnFormat.HEX -> hexToByteArray(signature)
+      else -> throw Exception("INVALID_INPUT_FORMAT")
+    })
     return valid
   }
 
@@ -342,6 +382,7 @@ class DeviceCryptoModule : Module() {
       return
     }
 
+    val format = ReturnFormat.valueOf(o["encryptionFormat"] as String)
     val algoType = AlgorithmType.valueOf(o["algoType"] as String)
     val algo = toAndroidAlgo(algoType)
     val oaepSpec = getOaepSpec(algoType)
@@ -353,7 +394,11 @@ class DeviceCryptoModule : Module() {
       cipher.init(Cipher.ENCRYPT_MODE, entry.certificate.publicKey)
     }
     val encrypted: ByteArray = cipher.doFinal(data.toByteArray(Charsets.UTF_8))
-    promise.resolve(Base64.encodeToString(encrypted, Base64.NO_WRAP))
+    promise.resolve(when (format) {
+      ReturnFormat.BASE64 -> Base64.encodeToString(encrypted, Base64.NO_WRAP)
+      ReturnFormat.HEX -> byteArrayToHex(encrypted)
+      else -> throw Exception("INVALID_OUTPUT_FORMAT")
+    })
   }
 
   private fun decrypt(alias: String, data: String, o: Map<String, Any?>, promise: Promise) {
@@ -367,13 +412,18 @@ class DeviceCryptoModule : Module() {
 
     val title = o["title"] as String
     val subtitle = o["subtitle"] as String
+    val format = ReturnFormat.valueOf(o["encryptionFormat"] as String)
     val authMethod = o["authMethod"] as String
     val algoType = AlgorithmType.valueOf(o["algoType"] as String)
     val algo = toAndroidAlgo(algoType)
     val oaepSpec = getOaepSpec(algoType)
 
     val cipher = Cipher.getInstance(algo)
-    val ciphertext = Base64.decode(data, Base64.NO_WRAP)
+    val ciphertext = when (format) {
+      ReturnFormat.BASE64 -> Base64.decode(data, Base64.NO_WRAP)
+      ReturnFormat.HEX -> hexToByteArray(data)
+      else -> throw Exception("INVALID_INPUT_FORMAT")
+    }
 
     if (!reqAuth) {
       if (oaepSpec != null) {

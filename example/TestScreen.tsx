@@ -4,6 +4,7 @@ import DeviceCrypto, {
   AuthMethod,
   SigningAlgorithm,
   EncryptionAlgorithm,
+  FormatType,
 } from "expo-device-crypto";
 import { useState } from "react";
 import {
@@ -32,6 +33,7 @@ export default function TestScreen() {
   const [algoType, setAlgoType] = useState<
     SigningAlgorithm | EncryptionAlgorithm
   >(SigningAlgorithm.ECDSA_SECP256R1_SHA256);
+  const [format, setFormat] = useState<FormatType>(FormatType.BASE64);
   const [publicKeyFormat, setPublicKeyFormat] = useState<"DER" | "PEM">("DER");
   const [retrievedPublicKey, setRetrievedPublicKey] = useState<string>("");
   const [textToEncrypt, setTextToEncrypt] = useState<string>("text to encrypt");
@@ -84,10 +86,19 @@ export default function TestScreen() {
         </View>
         <View style={styles.inline}>
           <Text>Prefer Strong Box</Text>
-          <Switch
-            value={preferStrongBox}
-            onValueChange={setPreferStrongBox}
-          />
+          <Switch value={preferStrongBox} onValueChange={setPreferStrongBox} />
+        </View>
+        <View>
+          <Text>Input Format:</Text>
+          <Picker
+            selectedValue={format}
+            onValueChange={(itemValue) =>
+              setFormat(itemValue as FormatType)
+            }
+          >
+            <Picker.Item label="Base64" value={FormatType.BASE64} />
+            <Picker.Item label="Hex" value={FormatType.HEX} />
+          </Picker>
         </View>
         <View>
           <Text>Key Type: </Text>
@@ -97,9 +108,18 @@ export default function TestScreen() {
               setAlgoType(itemValue as SigningAlgorithm | EncryptionAlgorithm)
             }
           >
-            <Picker.Item label="ECDSA SECP256R1 SHA256" value={SigningAlgorithm.ECDSA_SECP256R1_SHA256} />
-            <Picker.Item label="RSA 2048 OAEP SHA1" value={EncryptionAlgorithm.RSA_2048_OAEP_SHA1} />
-            <Picker.Item label="RSA 2048 PKCS1" value={EncryptionAlgorithm.RSA_2048_PKCS1} />
+            <Picker.Item
+              label="ECDSA SECP256R1 SHA256"
+              value={SigningAlgorithm.ECDSA_SECP256R1_SHA256}
+            />
+            <Picker.Item
+              label="RSA 2048 OAEP SHA1"
+              value={EncryptionAlgorithm.RSA_2048_OAEP_SHA1}
+            />
+            <Picker.Item
+              label="RSA 2048 PKCS1"
+              value={EncryptionAlgorithm.RSA_2048_PKCS1}
+            />
           </Picker>
         </View>
         <TextInput
@@ -173,6 +193,7 @@ export default function TestScreen() {
               authMethod: AuthMethod.PASSCODE_OR_BIOMETRIC,
               promptTitle: "TEST",
               promptSubtitle: "TEST",
+              signatureFormat: format,
             })
               .then((result) => {
                 setSignature(result ?? "");
@@ -197,7 +218,10 @@ export default function TestScreen() {
               const verified = await DeviceCrypto.verify(
                 alias,
                 textToSign,
-                signature
+                signature,
+                {
+                  signatureFormat: format,
+                }
               );
               setVerified(verified ?? false);
             } catch (error) {
@@ -222,6 +246,7 @@ export default function TestScreen() {
           onPress={() => {
             DeviceCrypto.encrypt(alias, textToEncrypt, {
               algorithmType: algoType as EncryptionAlgorithm,
+              encryptionFormat: format,
             })
               .then((result) => {
                 setEncrypted(result ?? "");
@@ -244,6 +269,7 @@ export default function TestScreen() {
           onPress={() => {
             DeviceCrypto.decrypt(alias, encrypted, {
               algorithmType: algoType as EncryptionAlgorithm,
+              encryptionFormat: format,
             })
               .then((result) => {
                 setDecrypted(result ?? "");

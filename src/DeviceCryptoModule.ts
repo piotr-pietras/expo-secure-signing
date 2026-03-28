@@ -12,6 +12,7 @@ import {
   SigningAlgorithm,
   EncryptOptions,
   EncryptionAlgorithm,
+  FormatType,
 } from "./DeviceCrypto.types";
 
 function base64ToPem(base64: string, label = "DATA") {
@@ -95,16 +96,18 @@ export default {
   /**
    * Signs the given data with the private key for the given alias.
    * @param alias - The alias to use for the key pair.
-   * @param data - The data to sign.
+   * @param data - The utf-8 encoded data to sign.
    * @param options - The options for the operation.
-   * @returns The signature.
+   * @returns The signature in 'options.signatureFormat' format. (@default FormatType.BASE64)
    */
   sign: async (alias: string, data: string, options?: SignOptions) => {
     const o = {
       title: options?.promptTitle ?? "Unlock",
       subtitle: options?.promptSubtitle ?? "Enter your PIN to continue",
       authMethod: options?.authMethod ?? AuthMethod.PASSCODE_OR_BIOMETRIC,
-      algoType: options?.algorithmType ?? SigningAlgorithm.ECDSA_SECP256R1_SHA256,
+      algoType:
+        options?.algorithmType ?? SigningAlgorithm.ECDSA_SECP256R1_SHA256,
+      signatureFormat: options?.signatureFormat ?? FormatType.BASE64,
     };
     return module.sign(alias, data, o);
   },
@@ -112,7 +115,7 @@ export default {
    * Verifies the given data with the signature for the given alias.
    * @param alias - The alias to use for the key pair.
    * @param data - The data to verify in UTF-8 format.
-   * @param signature - The signature to verify in Base64 format.
+   * @param signature - The signature to verify in 'options.signatureFormat' format. (@default FormatType.BASE64)
    * @param options - The options for the operation.
    * @returns True if the signature is valid, false otherwise.
    */
@@ -123,30 +126,33 @@ export default {
     options?: VerifyOptions
   ) => {
     const o = {
-      algoType: options?.algorithmType ?? SigningAlgorithm.ECDSA_SECP256R1_SHA256,
+      algoType:
+        options?.algorithmType ?? SigningAlgorithm.ECDSA_SECP256R1_SHA256,
+      signatureFormat: options?.signatureFormat ?? FormatType.BASE64,
     };
     return module.verify(alias, data, signature, o);
   },
   /**
    * Signs the given data with the private key for the given alias.
    * @param alias - The alias to use for the key pair.
-   * @param data - The data to sign in UTF-8 format.
+   * @param data - The utf-8 encoded data to encrypt.
    * @param options - The options for the operation.
-   * @default { 
-   *  algoType: EncryptionAlgorithm.RSA_2048_PKCS1, 
+   * @default {
+   *  algoType: EncryptionAlgorithm.RSA_2048_PKCS1,
    * }
-   * @returns The signature.
+   * @returns The signature in 'options.encryptionFormat' format. (@default FormatType.BASE64)
    */
   encrypt: async (alias: string, data: string, options?: EncryptOptions) => {
     const o = {
       algoType: options?.algorithmType ?? EncryptionAlgorithm.RSA_2048_PKCS1,
+      encryptionFormat: options?.encryptionFormat ?? FormatType.BASE64,
     };
     return module.encrypt(alias, data, o);
   },
   /**
    * Decrypts the given data with the private key for the given alias.
    * @param alias - The alias to use for the key pair.
-   * @param data - The data to decrypt in Base64 format.
+   * @param data - The data to decrypt in 'options.encryptionFormat' format. (@default FormatType.BASE64)
    * @param options - The options for the operation.
    * @returns The decrypted data.
    */
@@ -156,6 +162,7 @@ export default {
       subtitle: options?.promptSubtitle ?? "Enter your PIN to continue",
       authMethod: options?.authMethod ?? AuthMethod.PASSCODE_OR_BIOMETRIC,
       algoType: options?.algorithmType ?? EncryptionAlgorithm.RSA_2048_PKCS1,
+      encryptionFormat: options?.encryptionFormat ?? FormatType.BASE64,
     };
     return module.decrypt(alias, data, o);
   },

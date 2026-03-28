@@ -24,6 +24,11 @@ export enum EncryptionAlgorithm {
   RSA_2048_OAEP_SHA1 = "RSA_2048_OAEP_SHA1",
 }
 
+export enum FormatType {
+  BASE64 = "BASE64",
+  HEX = "HEX",
+}
+
 export interface GenerateKeyPairOptions {
   /**
    * The algorithm type of the key to generate.
@@ -89,6 +94,11 @@ interface BaseSigningOptions {
    * The algorithm type of the key to use for signing.
    */
   algorithmType?: SigningAlgorithm;
+  /**
+   * The format of the signature to return.
+   * @default FormatType.BASE64
+   */
+  signatureFormat?: FormatType;
 }
 
 interface BaseEncryptionOptions {
@@ -96,12 +106,19 @@ interface BaseEncryptionOptions {
    * The algorithm type of the key to use for encrypting.
    */
   algorithmType?: EncryptionAlgorithm;
+  /**
+   * The format of the encryption to return.
+   * @default FormatType.BASE64
+   */
+  encryptionFormat?: FormatType;
 }
 
-export interface SignOptions extends BaseSignDecryptOptions, BaseSigningOptions {}
+export interface SignOptions
+  extends BaseSignDecryptOptions, BaseSigningOptions {}
 export interface VerifyOptions extends BaseSigningOptions {}
 
-export interface DecryptOptions extends BaseSignDecryptOptions, BaseEncryptionOptions {}
+export interface DecryptOptions
+  extends BaseSignDecryptOptions, BaseEncryptionOptions {}
 export interface EncryptOptions extends BaseEncryptionOptions {}
 
 export interface GetPublicKeyOptions {

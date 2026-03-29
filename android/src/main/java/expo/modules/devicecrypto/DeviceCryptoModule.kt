@@ -330,7 +330,6 @@ class DeviceCryptoModule : Module() {
       promise.resolve(when (format) {
         ReturnFormat.BASE64 -> Base64.encodeToString(signature, Base64.NO_WRAP)
         ReturnFormat.HEX -> byteArrayToHex(signature)
-        else -> throw Exception("INVALID_OUTPUT_FORMAT")
       })
       return
     } else {
@@ -343,7 +342,6 @@ class DeviceCryptoModule : Module() {
           promise.resolve(when (format) {
             ReturnFormat.BASE64 -> Base64.encodeToString(signature, Base64.NO_WRAP)
             ReturnFormat.HEX -> byteArrayToHex(signature)
-            else -> throw Exception("INVALID_OUTPUT_FORMAT")
           })
         },
         onError = { error ->
@@ -370,7 +368,6 @@ class DeviceCryptoModule : Module() {
     }.verify(when (format) {
       ReturnFormat.BASE64 -> Base64.decode(signature, Base64.NO_WRAP)
       ReturnFormat.HEX -> hexToByteArray(signature)
-      else -> throw Exception("INVALID_INPUT_FORMAT")
     })
     return valid
   }
@@ -397,7 +394,6 @@ class DeviceCryptoModule : Module() {
     promise.resolve(when (format) {
       ReturnFormat.BASE64 -> Base64.encodeToString(encrypted, Base64.NO_WRAP)
       ReturnFormat.HEX -> byteArrayToHex(encrypted)
-      else -> throw Exception("INVALID_OUTPUT_FORMAT")
     })
   }
 
@@ -422,7 +418,6 @@ class DeviceCryptoModule : Module() {
     val ciphertext = when (format) {
       ReturnFormat.BASE64 -> Base64.decode(data, Base64.NO_WRAP)
       ReturnFormat.HEX -> hexToByteArray(data)
-      else -> throw Exception("INVALID_INPUT_FORMAT")
     }
 
     if (!reqAuth) {

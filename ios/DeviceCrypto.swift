@@ -26,6 +26,31 @@ enum AlgorithmType: String {
   case RSA_2048_OAEP_SHA1 = "RSA_2048_OAEP_SHA1"
 }
 
+enum ReturnFormat: String {
+  case BASE64 = "BASE64"
+  case HEX = "HEX"
+}
+
+private extension Data {
+  init?(hexEncodedString: String) {
+    let length = hexEncodedString.count
+    guard length > 0, length % 2 == 0 else { return nil }
+
+    var decoded = Data(capacity: length / 2)
+    var index = hexEncodedString.startIndex
+
+    for _ in stride(from: 0, to: length, by: 2) {
+      let nextIndex = hexEncodedString.index(index, offsetBy: 2)
+      let byteString = hexEncodedString[index..<nextIndex]
+      guard let byte = UInt8(byteString, radix: 16) else { return nil }
+      decoded.append(byte)
+      index = nextIndex
+    }
+
+    self = decoded
+  }
+}
+
 public class DeviceCryptoModule: Module {
   private func toiOSAlgo(algorithm: AlgorithmType) -> SecKeyAlgorithm {
     switch algorithm {
@@ -309,6 +334,7 @@ public class DeviceCryptoModule: Module {
 
     let algoType = AlgorithmType(rawValue: o["algoType"] as! String)
     let algo = self.toiOSAlgo(algorithm: algoType!)
+    let format = ReturnFormat(rawValue: o["signatureFormat"] as! String)
 
     var signingError: Unmanaged<CFError>?
     let signatureCF = SecKeyCreateSignature(
@@ -324,7 +350,12 @@ public class DeviceCryptoModule: Module {
 
     guard let signatureCF else { return nil }
     let signature = signatureCF as Data
-    return signature.base64EncodedString()
+    return switch format {
+      case .BASE64:
+        signature.base64EncodedString()
+      case .HEX:
+        signature.hexEncodedString()
+    }
   }
 
   private func verify(alias: String, data: String, signature: String, o: [String: Any]) -> Bool? {
@@ -332,7 +363,14 @@ public class DeviceCryptoModule: Module {
     guard let secKey else { return nil }
 
     guard let publicKey = SecKeyCopyPublicKey(secKey) else { return nil }
-    guard let signatureData = Data(base64Encoded: signature) else { return nil }
+    
+    let format = ReturnFormat(rawValue: o["signatureFormat"] as! String)
+    guard let signatureData = switch format {
+      case .BASE64:
+        Data(base64Encoded: signature)
+      case .HEX:
+        Data(hexEncodedString: signature)
+    } else { return nil }
 
     let algoType = AlgorithmType(rawValue: o["algoType"] as! String)
     let algo = self.toiOSAlgo(algorithm: algoType!)
@@ -354,6 +392,7 @@ public class DeviceCryptoModule: Module {
 
     let algoType = AlgorithmType(rawValue: o["algoType"] as! String)
     let algo = self.toiOSAlgo(algorithm: algoType!)
+    let format = ReturnFormat(rawValue: o["encryptionFormat"] as! String)
 
     guard let encrypted = SecKeyCreateEncryptedData(
       publicKey,
@@ -364,13 +403,25 @@ public class DeviceCryptoModule: Module {
       return nil
     }
 
-    return encrypted.base64EncodedString()
+    return switch format {
+      case .BASE64:
+        encrypted.base64EncodedString()
+      case .HEX:
+        encrypted.hexEncodedString()
+    }
   }
 
   private func decrypt(alias: String, data: String, o: [String: Any]) -> String? {
     let secKey = self.getSecKeyByAlias(alias, keyClass: kSecAttrKeyClassPrivate)
     guard let secKey else { return nil }
-    guard let encryptedData = Data(base64Encoded: data) else { return nil }
+
+    let format = ReturnFormat(rawValue: o["encryptionFormat"] as! String)
+    guard let encryptedData = switch(format) {
+      case .BASE64:
+        Data(base64Encoded: data)
+      case .HEX:
+        Data(hexEncodedString: data)
+    } else { return nil }
 
     let algoType = AlgorithmType(rawValue: o["algoType"] as! String)
     let algo = self.toiOSAlgo(algorithm: algoType!)

@@ -100,6 +100,7 @@ export default function TestScreen() {
             <Picker.Item label="ECDSA SECP256R1 SHA256" value={SigningAlgorithm.ECDSA_SECP256R1_SHA256} />
             <Picker.Item label="RSA 2048 OAEP SHA1" value={EncryptionAlgorithm.RSA_2048_OAEP_SHA1} />
             <Picker.Item label="RSA 2048 PKCS1" value={EncryptionAlgorithm.RSA_2048_PKCS1} />
+            <Picker.Item label="AES 256 GCM" value={EncryptionAlgorithm.AES_256_GCM} />
           </Picker>
         </View>
         <TextInput

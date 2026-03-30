@@ -6,12 +6,15 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyInfo
 import android.security.keystore.KeyProperties.AUTH_BIOMETRIC_STRONG
 import android.security.keystore.KeyProperties.AUTH_DEVICE_CREDENTIAL
+import android.security.keystore.KeyProperties.BLOCK_MODE_GCM
 import android.security.keystore.KeyProperties.DIGEST_SHA1
 import android.security.keystore.KeyProperties.DIGEST_SHA256
+import android.security.keystore.KeyProperties.ENCRYPTION_PADDING_NONE
 import android.security.keystore.KeyProperties.ENCRYPTION_PADDING_RSA_OAEP
 import android.security.keystore.KeyProperties.ENCRYPTION_PADDING_RSA_PKCS1
 import android.security.keystore.KeyProperties.KEY_ALGORITHM_EC
 import android.security.keystore.KeyProperties.KEY_ALGORITHM_RSA
+import android.security.keystore.KeyProperties.KEY_ALGORITHM_AES
 import android.security.keystore.KeyProperties.PURPOSE_DECRYPT
 import android.security.keystore.KeyProperties.PURPOSE_ENCRYPT
 import android.security.keystore.KeyProperties.PURPOSE_SIGN
@@ -33,6 +36,8 @@ import java.security.Signature
 import java.security.spec.AlgorithmParameterSpec
 import java.security.spec.MGF1ParameterSpec
 import javax.crypto.Cipher
+import javax.crypto.KeyGenerator
+import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.OAEPParameterSpec
 import javax.crypto.spec.PSource
 
@@ -58,6 +63,7 @@ enum class AlgorithmType {
   ECDSA_SECP256R1_SHA256,
   RSA_2048_PKCS1,
   RSA_2048_OAEP_SHA1,
+  AES_256_GCM,
 }
 
 class DeviceCryptoModule : Module() {
@@ -66,6 +72,7 @@ class DeviceCryptoModule : Module() {
       AlgorithmType.ECDSA_SECP256R1_SHA256 -> "SHA256withECDSA"
       AlgorithmType.RSA_2048_PKCS1 -> "RSA/ECB/PKCS1Padding"
       AlgorithmType.RSA_2048_OAEP_SHA1 -> "RSA/ECB/OAEPwithSHA-1AndMGF1Padding"
+      AlgorithmType.AES_256_GCM -> "AES/GCM/NoPadding"
     }
   }
 
@@ -93,10 +100,20 @@ class DeviceCryptoModule : Module() {
     return strongboxKeystore
   }
 
-  private fun isKeyStoreRequireAuthentication(entry: KeyStore.PrivateKeyEntry): Boolean {
-    val keyFactory = KeyFactory.getInstance(entry.privateKey.algorithm, "AndroidKeyStore")
-    val keyInfo = keyFactory.getKeySpec(entry.privateKey, KeyInfo::class.java)
-    return keyInfo.isUserAuthenticationRequired
+  private fun isKeyStoreRequireAuthentication(entry: KeyStore.Entry): Boolean {
+    return when (entry) {
+      is KeyStore.PrivateKeyEntry -> {
+        val keyFactory = KeyFactory.getInstance(entry.privateKey.algorithm, "AndroidKeyStore")
+        val keyInfo = keyFactory.getKeySpec(entry.privateKey, KeyInfo::class.java)
+        keyInfo.isUserAuthenticationRequired
+      }
+      is KeyStore.SecretKeyEntry -> {
+        val secretKeyFactory = javax.crypto.SecretKeyFactory.getInstance(entry.secretKey.algorithm, "AndroidKeyStore")
+        val keyInfo = secretKeyFactory.getKeySpec(entry.secretKey, KeyInfo::class.java) as KeyInfo
+        keyInfo.isUserAuthenticationRequired
+      }
+      else -> false
+    }
   }
 
   private fun getKeyStoreEntry(alias: String): KeyStore.Entry? {
@@ -165,6 +182,33 @@ class DeviceCryptoModule : Module() {
     }
     kpg.initialize(parameterSpec)
     return kpg
+  }
+
+  private fun buildAES(
+    alias: String,
+    keySize: Int,
+    reqAuth: Boolean,
+    strongBox: Boolean): KeyGenerator {
+    val kg: KeyGenerator = KeyGenerator.getInstance(KEY_ALGORITHM_AES, "AndroidKeyStore")
+    val parameterSpec: KeyGenParameterSpec = KeyGenParameterSpec.Builder(
+      alias,
+      PURPOSE_ENCRYPT or PURPOSE_DECRYPT
+    ).run {
+      setKeySize(keySize)
+      setBlockModes(BLOCK_MODE_GCM)
+      setEncryptionPaddings(ENCRYPTION_PADDING_NONE)
+      setIsStrongBoxBacked(strongBox)
+      setUserAuthenticationRequired(reqAuth)
+      if (reqAuth) {
+        setUserAuthenticationParameters(
+          30, // 30 seconds
+          AUTH_BIOMETRIC_STRONG or AUTH_DEVICE_CREDENTIAL
+        )
+      }
+      build()
+    }
+    kg.init(parameterSpec)
+    return kg
   }
 
 
@@ -245,14 +289,13 @@ class DeviceCryptoModule : Module() {
     val preferStrongBox = o["preferStrongBox"] as Boolean
     val strongBox = preferStrongBox && isStrongBoxAvailable()
 
-    val kpg = when (algoType) {
-      AlgorithmType.ECDSA_SECP256R1_SHA256 -> buildECDSA(alias, DIGEST_SHA256, reqAuth, strongBox)
-      AlgorithmType.RSA_2048_PKCS1 -> buildRSA(alias, null, ENCRYPTION_PADDING_RSA_PKCS1, reqAuth, strongBox)
-      AlgorithmType.RSA_2048_OAEP_SHA1 -> buildRSA(alias, DIGEST_SHA1, ENCRYPTION_PADDING_RSA_OAEP, reqAuth, strongBox)
+    when (algoType) {
+      AlgorithmType.ECDSA_SECP256R1_SHA256 -> buildECDSA(alias, DIGEST_SHA256, reqAuth, strongBox).generateKeyPair()
+      AlgorithmType.RSA_2048_PKCS1 -> buildRSA(alias, null, ENCRYPTION_PADDING_RSA_PKCS1, reqAuth, strongBox).generateKeyPair()
+      AlgorithmType.RSA_2048_OAEP_SHA1 -> buildRSA(alias, DIGEST_SHA1, ENCRYPTION_PADDING_RSA_OAEP, reqAuth, strongBox).generateKeyPair()
+      AlgorithmType.AES_256_GCM -> buildAES(alias, 256, reqAuth, strongBox).generateKey()
       else -> throw Exception("INVALID_ALGORITHM_TYPE")
     }
-
-    kpg.generateKeyPair()
 
     return GenerateKeyPairResult.KEY_PAIR_GENERATED
   }
@@ -336,32 +379,83 @@ class DeviceCryptoModule : Module() {
 
   private fun encrypt(alias: String, data: String, o: Map<String, Any?>, promise: Promise) {
     val entry = getKeyStoreEntry(alias)
-    if (entry !is KeyStore.PrivateKeyEntry) {
+    if (entry !is KeyStore.PrivateKeyEntry && entry !is KeyStore.SecretKeyEntry) {
       promise.resolve(null)
       return
     }
+    val reqAuth = isKeyStoreRequireAuthentication(entry)
 
+    val title = o["title"] as String
+    val subtitle = o["subtitle"] as String
+    val authMethod = o["authMethod"] as String
     val algoType = AlgorithmType.valueOf(o["algoType"] as String)
     val algo = toAndroidAlgo(algoType)
     val oaepSpec = getOaepSpec(algoType)
 
     val cipher = Cipher.getInstance(algo)
-    if (oaepSpec != null) {
-      cipher.init(Cipher.ENCRYPT_MODE, entry.certificate.publicKey, oaepSpec)
-    } else {
-      cipher.init(Cipher.ENCRYPT_MODE, entry.certificate.publicKey)
+    fun runEncryption(): String? {
+      val encryptedData: ByteArray = when (algoType) {
+        AlgorithmType.RSA_2048_PKCS1 -> {
+          if (entry !is KeyStore.PrivateKeyEntry) return null
+          cipher.init(Cipher.ENCRYPT_MODE, entry.certificate.publicKey)
+          cipher.doFinal(data.toByteArray(Charsets.UTF_8))
+        }
+        AlgorithmType.RSA_2048_OAEP_SHA1 -> {
+          if (entry !is KeyStore.PrivateKeyEntry || oaepSpec == null) return null
+          cipher.init(Cipher.ENCRYPT_MODE, entry.certificate.publicKey, oaepSpec)
+          cipher.doFinal(data.toByteArray(Charsets.UTF_8))
+        }
+        AlgorithmType.AES_256_GCM -> {
+          if (entry !is KeyStore.SecretKeyEntry) return null
+          cipher.init(Cipher.ENCRYPT_MODE, entry.secretKey)
+          cipher.doFinal(data.toByteArray(Charsets.UTF_8))
+        }
+        else -> throw Exception("INVALID_ALGORITHM_TYPE")
+      }
+      val output = if (algoType == AlgorithmType.AES_256_GCM) {
+        val iv = cipher.iv
+        iv + encryptedData
+      } else {
+        encryptedData
+      }
+      return Base64.encodeToString(output, Base64.NO_WRAP)
     }
-    val encrypted: ByteArray = cipher.doFinal(data.toByteArray(Charsets.UTF_8))
-    promise.resolve(Base64.encodeToString(encrypted, Base64.NO_WRAP))
+
+    // Symmetric encryption may requires authentication
+    if (algoType == AlgorithmType.AES_256_GCM) {
+      if (reqAuth) {
+        showAuthPrompt(
+          onSuccess = {
+            promise.resolve(runEncryption())
+          },
+          onError = { error ->
+            promise.reject("ERR_AUTH_FAILED", error, null)
+          },
+          title = title,
+          subtitle = subtitle,
+          authMethod = when (authMethod) {
+            "PASSCODE" -> AuthMethod.PASSCODE
+            "PASSCODE_OR_BIOMETRIC" -> AuthMethod.PASSCODE_OR_BIOMETRIC
+            else -> AuthMethod.PASSCODE_OR_BIOMETRIC
+          }
+        )
+        return
+      } else {
+        promise.resolve(runEncryption())
+        return
+      }
+    }
+
+    // Asymmetric encryption does not require authentication
+    promise.resolve(runEncryption())
   }
 
   private fun decrypt(alias: String, data: String, o: Map<String, Any?>, promise: Promise) {
     val entry = getKeyStoreEntry(alias)
-    if (entry !is KeyStore.PrivateKeyEntry) {
+    if (entry !is KeyStore.PrivateKeyEntry && entry !is KeyStore.SecretKeyEntry) {
       promise.resolve(null)
       return
     }
-
     val reqAuth = isKeyStoreRequireAuthentication(entry)
 
     val title = o["title"] as String
@@ -374,25 +468,39 @@ class DeviceCryptoModule : Module() {
     val cipher = Cipher.getInstance(algo)
     val ciphertext = Base64.decode(data, Base64.NO_WRAP)
 
-    if (!reqAuth) {
-      if (oaepSpec != null) {
-        cipher.init(Cipher.DECRYPT_MODE, entry.privateKey, oaepSpec)
-      } else {
-        cipher.init(Cipher.DECRYPT_MODE, entry.privateKey)
+    fun runDecryption(): String? {
+      val decrypted: ByteArray = when (algoType) {
+        AlgorithmType.RSA_2048_PKCS1 -> {
+          if (entry !is KeyStore.PrivateKeyEntry) return null
+          cipher.init(Cipher.DECRYPT_MODE, entry.privateKey)
+          cipher.doFinal(ciphertext)
+        }
+        AlgorithmType.RSA_2048_OAEP_SHA1 -> {
+          if (entry !is KeyStore.PrivateKeyEntry) return null
+          cipher.init(Cipher.DECRYPT_MODE, entry.privateKey, oaepSpec)
+          cipher.doFinal(ciphertext)
+        }
+        AlgorithmType.AES_256_GCM -> {
+          if (entry !is KeyStore.SecretKeyEntry) return null
+          if (ciphertext.size <= 12) return null
+          val iv = ciphertext.copyOfRange(0, 12)
+          val encryptedData = ciphertext.copyOfRange(12, ciphertext.size)
+          val gcmSpec = GCMParameterSpec(128, iv)
+          cipher.init(Cipher.DECRYPT_MODE, entry.secretKey, gcmSpec)
+          cipher.doFinal(encryptedData)
+        }
+        else -> throw Exception("INVALID_ALGORITHM_TYPE")
       }
-      val decrypted: ByteArray = cipher.doFinal(ciphertext)
-      promise.resolve(String(decrypted, Charsets.UTF_8))
+      return String(decrypted, Charsets.UTF_8)
+    }
+
+    if (!reqAuth) {
+      promise.resolve(runDecryption())
       return
     } else {
       showAuthPrompt(
         onSuccess = {
-          if (oaepSpec != null) {
-            cipher.init(Cipher.DECRYPT_MODE, entry.privateKey, oaepSpec)
-          } else {
-            cipher.init(Cipher.DECRYPT_MODE, entry.privateKey)
-          }
-          val decrypted: ByteArray = cipher.doFinal(ciphertext)
-          promise.resolve(String(decrypted, Charsets.UTF_8))
+          promise.resolve(runDecryption())
         },
         onError = { error ->
           promise.reject("ERR_AUTH_FAILED", error, null)

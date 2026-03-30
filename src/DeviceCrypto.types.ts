@@ -19,7 +19,10 @@ export enum SigningAlgorithm {
   ECDSA_SECP256R1_SHA256 = "ECDSA_SECP256R1_SHA256",
 }
 
+type SymmetricEncryptionAlgorithm = "AES_256_GCM";
+type AsymmetricEncryptionAlgorithm = "RSA_2048_PKCS1" | "RSA_2048_OAEP_SHA1";
 export enum EncryptionAlgorithm {
+  AES_256_GCM = "AES_256_GCM",
   RSA_2048_PKCS1 = "RSA_2048_PKCS1",
   RSA_2048_OAEP_SHA1 = "RSA_2048_OAEP_SHA1",
 }
@@ -62,7 +65,7 @@ export interface GenerateKeyPairOptions {
   preferStrongBox?: boolean;
 }
 
-interface BaseSignDecryptOptions {
+interface AndroidAuthOptions {
   /**
    * The title of the prompt to show when authentication is required.
    * @default "Unlock"
@@ -91,18 +94,33 @@ interface BaseSigningOptions {
   algorithmType?: SigningAlgorithm;
 }
 
-interface BaseEncryptionOptions {
+interface BaseDecryptionOptions {
   /**
    * The algorithm type of the key to use for encrypting.
    */
   algorithmType?: EncryptionAlgorithm;
 }
 
-export interface SignOptions extends BaseSignDecryptOptions, BaseSigningOptions {}
-export interface VerifyOptions extends BaseSigningOptions {}
+interface BaseAsymmetricEncryptionOptions {
+  /**
+   * The algorithm type of the key to use for encrypting.
+   */
+  algorithmType?: AsymmetricEncryptionAlgorithm;
+}
 
-export interface DecryptOptions extends BaseSignDecryptOptions, BaseEncryptionOptions {}
-export interface EncryptOptions extends BaseEncryptionOptions {}
+interface BaseSymmetricEncryptionOptions extends AndroidAuthOptions {
+  /**
+   * The algorithm type of the key to use for encrypting.
+   */
+  algorithmType?: SymmetricEncryptionAlgorithm;
+} 
+
+export type SignOptions = AndroidAuthOptions & BaseSigningOptions;
+export type VerifyOptions = BaseSigningOptions;
+export type DecryptOptions = AndroidAuthOptions & BaseDecryptionOptions;
+export type EncryptOptions =
+  | BaseAsymmetricEncryptionOptions
+  | BaseSymmetricEncryptionOptions;
 
 export interface GetPublicKeyOptions {
   /**

@@ -32,11 +32,17 @@ export default function TestScreen() {
   const [algoType, setAlgoType] = useState<
     SigningAlgorithm | EncryptionAlgorithm
   >(SigningAlgorithm.ECDSA_SECP256R1_SHA256);
-  const [publicKeyFormat, setPublicKeyFormat] = useState<"DER" | "PEM">("DER");
+  const [publicKeyFormat, setPublicKeyFormat] = useState<"BASE64" | "PEM">(
+    "BASE64"
+  );
   const [retrievedPublicKey, setRetrievedPublicKey] = useState<string>("");
   const [textToEncrypt, setTextToEncrypt] = useState<string>("text to encrypt");
   const [encrypted, setEncrypted] = useState<string>("");
   const [decrypted, setDecrypted] = useState<string>("");
+  const [peerPublicKey, setPeerPublicKey] = useState<string>(
+    "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEk72yPYU5xkstWM23dYkyzJ6IeMhVoN1zo5qIrDZoJaX9DMzYloKVuj9u7iYJrGzbzEy2QA/kfFA/SjLicu7fDg=="
+  );
+  const [sharedSecret, setSharedSecret] = useState<string>("");
 
   return (
     <ScrollView style={styles.container}>
@@ -84,10 +90,7 @@ export default function TestScreen() {
         </View>
         <View style={styles.inline}>
           <Text>Prefer Strong Box</Text>
-          <Switch
-            value={preferStrongBox}
-            onValueChange={setPreferStrongBox}
-          />
+          <Switch value={preferStrongBox} onValueChange={setPreferStrongBox} />
         </View>
         <View>
           <Text>Key Type: </Text>
@@ -97,9 +100,22 @@ export default function TestScreen() {
               setAlgoType(itemValue as SigningAlgorithm | EncryptionAlgorithm)
             }
           >
-            <Picker.Item label="ECDSA SECP256R1 SHA256" value={SigningAlgorithm.ECDSA_SECP256R1_SHA256} />
-            <Picker.Item label="RSA 2048 OAEP SHA1" value={EncryptionAlgorithm.RSA_2048_OAEP_SHA1} />
-            <Picker.Item label="RSA 2048 PKCS1" value={EncryptionAlgorithm.RSA_2048_PKCS1} />
+            <Picker.Item
+              label="ECDSA SECP256R1 SHA256"
+              value={SigningAlgorithm.ECDSA_SECP256R1_SHA256}
+            />
+            <Picker.Item
+              label="RSA 2048 OAEP SHA1"
+              value={EncryptionAlgorithm.RSA_2048_OAEP_SHA1}
+            />
+            <Picker.Item
+              label="RSA 2048 PKCS1"
+              value={EncryptionAlgorithm.RSA_2048_PKCS1}
+            />
+            <Picker.Item
+              label="ECIES P256 AES256 GCM"
+              value={EncryptionAlgorithm.ECIES_P256_AES256_GCM}
+            />
           </Picker>
         </View>
         <TextInput
@@ -138,7 +154,7 @@ export default function TestScreen() {
           <Switch
             value={publicKeyFormat === "PEM"}
             onValueChange={() =>
-              setPublicKeyFormat(publicKeyFormat === "PEM" ? "DER" : "PEM")
+              setPublicKeyFormat(publicKeyFormat === "PEM" ? "BASE64" : "PEM")
             }
           />
         </View>
@@ -222,6 +238,7 @@ export default function TestScreen() {
           onPress={() => {
             DeviceCrypto.encrypt(alias, textToEncrypt, {
               algorithmType: algoType as EncryptionAlgorithm,
+              peerPublicKey: peerPublicKey,
             })
               .then((result) => {
                 setEncrypted(result ?? "");
@@ -244,6 +261,7 @@ export default function TestScreen() {
           onPress={() => {
             DeviceCrypto.decrypt(alias, encrypted, {
               algorithmType: algoType as EncryptionAlgorithm,
+              peerPublicKey: peerPublicKey,
             })
               .then((result) => {
                 setDecrypted(result ?? "");
@@ -261,6 +279,27 @@ export default function TestScreen() {
         >
           <Text>{decrypted}</Text>
         </TouchableOpacity>
+      </Group>
+      <Group name="Compute Shared Secret">
+        <TextInput
+          style={[styles.input, { height: 150 }]}
+          placeholder="Enter peer public key in BASE64 format"
+          value={peerPublicKey}
+          onChangeText={setPeerPublicKey}
+        />
+        {/* <Button
+          onPress={() => {
+            DeviceCrypto.computeSharedSecret(alias, peerPublicKey)
+              .then((result) => {
+                setSharedSecret(result ?? "");
+              })
+              .catch((error) => {
+                console.error(error);
+              });
+          }}
+          title="Compute Shared Secret"
+        />
+        <Text>{sharedSecret}</Text> */}
       </Group>
     </ScrollView>
   );

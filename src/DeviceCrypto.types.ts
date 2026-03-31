@@ -22,6 +22,7 @@ export enum SigningAlgorithm {
 export enum EncryptionAlgorithm {
   RSA_2048_PKCS1 = "RSA_2048_PKCS1",
   RSA_2048_OAEP_SHA1 = "RSA_2048_OAEP_SHA1",
+  ECIES_P256_AES256_GCM = "ECIES_P256_AES256_GCM",
 }
 
 export interface GenerateKeyPairOptions {
@@ -96,6 +97,10 @@ interface BaseEncryptionOptions {
    * The algorithm type of the key to use for encrypting.
    */
   algorithmType?: EncryptionAlgorithm;
+  /**
+   * The peer public key to use for ECIES.
+   */
+  peerPublicKey?: string;
 }
 
 export interface SignOptions extends BaseSignDecryptOptions, BaseSigningOptions {}
@@ -109,5 +114,5 @@ export interface GetPublicKeyOptions {
    * The format of the public key to return.
    * @default "PEM" (Base64 of PEM-encoded SubjectPublicKeyInfo (SPKI) for P‑256)
    */
-  format?: "PEM";
+  format?: "PEM" | "BASE64";
 }

@@ -78,7 +78,10 @@ export default {
     if (!publicKey) return null;
     if (options?.format === "PEM") {
       return base64ToPem(publicKey, "PUBLIC KEY");
+    } else if (options?.format === "BASE64") {
+      return publicKey;
     }
+
     return base64ToPem(publicKey, "PUBLIC KEY");
   },
   /**
@@ -104,7 +107,8 @@ export default {
       title: options?.promptTitle ?? "Unlock",
       subtitle: options?.promptSubtitle ?? "Enter your PIN to continue",
       authMethod: options?.authMethod ?? AuthMethod.PASSCODE_OR_BIOMETRIC,
-      algoType: options?.algorithmType ?? SigningAlgorithm.ECDSA_SECP256R1_SHA256,
+      algoType:
+        options?.algorithmType ?? SigningAlgorithm.ECDSA_SECP256R1_SHA256,
     };
     return module.sign(alias, data, o);
   },
@@ -123,7 +127,8 @@ export default {
     options?: VerifyOptions
   ) => {
     const o = {
-      algoType: options?.algorithmType ?? SigningAlgorithm.ECDSA_SECP256R1_SHA256,
+      algoType:
+        options?.algorithmType ?? SigningAlgorithm.ECDSA_SECP256R1_SHA256,
     };
     return module.verify(alias, data, signature, o);
   },
@@ -132,14 +137,15 @@ export default {
    * @param alias - The alias to use for the key pair.
    * @param data - The data to sign in UTF-8 format.
    * @param options - The options for the operation.
-   * @default { 
-   *  algoType: EncryptionAlgorithm.RSA_2048_PKCS1, 
+   * @default {
+   *  algoType: EncryptionAlgorithm.RSA_2048_PKCS1,
    * }
    * @returns The signature.
    */
   encrypt: async (alias: string, data: string, options?: EncryptOptions) => {
     const o = {
       algoType: options?.algorithmType ?? EncryptionAlgorithm.RSA_2048_PKCS1,
+      peerPublicKey: options?.peerPublicKey ?? "",
     };
     return module.encrypt(alias, data, o);
   },
@@ -156,6 +162,7 @@ export default {
       subtitle: options?.promptSubtitle ?? "Enter your PIN to continue",
       authMethod: options?.authMethod ?? AuthMethod.PASSCODE_OR_BIOMETRIC,
       algoType: options?.algorithmType ?? EncryptionAlgorithm.RSA_2048_PKCS1,
+      peerPublicKey: options?.peerPublicKey ?? "",
     };
     return module.decrypt(alias, data, o);
   },

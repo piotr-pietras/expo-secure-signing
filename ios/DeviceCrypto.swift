@@ -2,6 +2,7 @@ import ExpoModulesCore
 import Security
 import Foundation
 import LocalAuthentication
+import CryptoKit
 
 enum SecureSigningModuleResult: String {
   case KEY_PAIR_GENERATED = "KEY_PAIR_GENERATED"
@@ -24,6 +25,7 @@ enum AlgorithmType: String {
   case ECDSA_SECP256R1_SHA256 = "ECDSA_SECP256R1_SHA256"
   case RSA_2048_PKCS1 = "RSA_2048_PKCS1"
   case RSA_2048_OAEP_SHA1 = "RSA_2048_OAEP_SHA1"
+  case ECIES_P256_AES256_GCM = "ECIES_P256_AES256_GCM"
 }
 
 public class DeviceCryptoModule: Module {
@@ -35,6 +37,8 @@ public class DeviceCryptoModule: Module {
       return .rsaEncryptionPKCS1
     case .RSA_2048_OAEP_SHA1:
       return .rsaEncryptionOAEPSHA1
+    case .ECIES_P256_AES256_GCM:
+      return .eciesEncryptionCofactorX963SHA256AESGCM
     }
   }
 
@@ -101,6 +105,20 @@ public class DeviceCryptoModule: Module {
     }
 
     return Data([0x80 | UInt8(bytes.count)]) + Data(bytes)
+  }
+
+  // Converts P‑256 SPKI DER format to ANSI x962 EC point format.
+  private func spkiP256ToX962(_ spki: Data) -> Data? {
+    let prefix = Data([
+      0x30, 0x59,
+      0x30, 0x13,
+      0x06, 0x07, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x02, 0x01,
+      0x06, 0x08, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x03, 0x01, 0x07,
+      0x03, 0x42, 0x00
+    ])
+    guard spki.count == prefix.count + 65 else { return nil }
+    guard spki.starts(with: prefix) else { return nil }
+    return spki.suffix(65)
   }
 
   private func getSecKeyQuery(_ alias: String, keyClass: CFString, returnRef: Bool = true) -> [String: Any] {
@@ -198,6 +216,76 @@ public class DeviceCryptoModule: Module {
     return SecKeyCreateRandomKey(attributes, nil)
   }
 
+  private func buildECIES(alias: String, reqAuth: Bool, authMethod: AuthMethod) -> SecKey? {
+    let accessFlags: SecAccessControlCreateFlags
+    if reqAuth {
+      switch authMethod {
+        case .PASSCODE:
+          accessFlags = [.privateKeyUsage, .devicePasscode]
+        case .PASSCODE_OR_BIOMETRIC:
+          accessFlags = [.privateKeyUsage, .userPresence]
+      }
+    } else {
+      accessFlags = .privateKeyUsage
+    }
+
+    let access = SecAccessControlCreateWithFlags(
+      kCFAllocatorDefault,
+      kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
+      accessFlags,
+      nil
+    )
+
+    let attributes: NSDictionary = [
+      kSecAttrKeyType: kSecAttrKeyTypeECSECPrimeRandom,
+      kSecAttrKeySizeInBits: 256,
+      kSecAttrTokenID: kSecAttrTokenIDSecureEnclave,
+      kSecPrivateKeyAttrs: [
+        kSecAttrIsPermanent: true,
+        kSecAttrApplicationTag: alias,
+        kSecAttrAccessControl: access
+      ],
+      kSecPublicKeyAttrs: [
+        kSecAttrIsPermanent: true,
+        kSecAttrApplicationTag: alias
+      ]
+    ]
+
+    return SecKeyCreateRandomKey(attributes, nil)
+  }
+
+  private func secKeyFromPeerPublicKey(_ peerPublicKey: String) -> SecKey? {
+    guard
+      let peerPublicKeyData = Data(base64Encoded: peerPublicKey),
+      let x962 = spkiP256ToX962(peerPublicKeyData)
+    else {
+      return nil
+    }
+
+    let attrs: [String: Any] = [
+      kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
+      kSecAttrKeyClass as String: kSecAttrKeyClassPublic,
+      kSecAttrKeySizeInBits as String: 256
+    ]
+
+    return SecKeyCreateWithData(x962 as CFData, attrs as CFDictionary, nil)
+  }
+
+  private func deriveSharedSecret(privateKey: SecKey, peerPublicKey: String) -> Data? {
+    guard let peerSecKey = secKeyFromPeerPublicKey(peerPublicKey) else { return nil }
+    let algorithm = SecKeyAlgorithm.ecdhKeyExchangeStandard
+    guard SecKeyIsAlgorithmSupported(privateKey, .keyExchange, algorithm) else { return nil }
+
+    let params: [String: Any] = [:]
+    return SecKeyCopyKeyExchangeResult(
+      privateKey,
+      algorithm,
+      peerSecKey,
+      params as CFDictionary,
+      nil
+    ) as Data?
+  }
+
   private func isAuthCheckAvailable() -> String {
     let context = LAContext()
     let available = context.canEvaluatePolicy(.deviceOwnerAuthentication, error: nil)
@@ -233,6 +321,8 @@ public class DeviceCryptoModule: Module {
         self.buildRSA(alias: alias, reqAuth: reqAuth, authMethod: authMethod!)
       case .RSA_2048_OAEP_SHA1:
         self.buildRSA(alias: alias, reqAuth: reqAuth, authMethod: authMethod!)
+      case .ECIES_P256_AES256_GCM:
+        self.buildECIES(alias: alias, reqAuth: reqAuth, authMethod: authMethod!)
       default:
         throw NSError(
           domain: "DeviceCrypto",
@@ -347,12 +437,27 @@ public class DeviceCryptoModule: Module {
     return valid
   }
 
-  private func encrypt(alias: String, data: String, o: [String: Any]) -> String? {
+  private func encrypt(alias: String, data: String, o: [String: Any]) throws -> String? {
+    let algoType = AlgorithmType(rawValue: o["algoType"] as! String)
+
+    if algoType == .ECIES_P256_AES256_GCM {
+      let secKey = self.getSecKeyByAlias(alias, keyClass: kSecAttrKeyClassPrivate)
+      guard let secKey else { return nil }
+      let peerPublicKey = o["peerPublicKey"] as! String
+      let sharedSecret = deriveSharedSecret(privateKey: secKey, peerPublicKey: peerPublicKey)
+      guard let sharedSecret else { return nil }
+
+      let symmetricKey = HKDF<SHA256>.deriveKey(
+        inputKeyMaterial: SymmetricKey(data: sharedSecret),
+        outputByteCount: 32
+      )
+      let sealed = try AES.GCM.seal(data.data(using: .utf8)!, using: symmetricKey)
+      return sealed.combined!.base64EncodedString()
+    }
+
     let secKey = self.getSecKeyByAlias(alias, keyClass: kSecAttrKeyClassPublic)
     guard let secKey else { return nil }
     let publicKey = SecKeyCopyPublicKey(secKey)!
-
-    let algoType = AlgorithmType(rawValue: o["algoType"] as! String)
     let algo = self.toiOSAlgo(algorithm: algoType!)
 
     guard let encrypted = SecKeyCreateEncryptedData(
@@ -367,12 +472,27 @@ public class DeviceCryptoModule: Module {
     return encrypted.base64EncodedString()
   }
 
-  private func decrypt(alias: String, data: String, o: [String: Any]) -> String? {
+  private func decrypt(alias: String, data: String, o: [String: Any]) throws -> String? {
     let secKey = self.getSecKeyByAlias(alias, keyClass: kSecAttrKeyClassPrivate)
     guard let secKey else { return nil }
     guard let encryptedData = Data(base64Encoded: data) else { return nil }
 
     let algoType = AlgorithmType(rawValue: o["algoType"] as! String)
+
+    if algoType == .ECIES_P256_AES256_GCM {
+      let peerPublicKey = o["peerPublicKey"] as! String
+      let sharedSecret = deriveSharedSecret(privateKey: secKey, peerPublicKey: peerPublicKey)
+      guard let sharedSecret else { return nil }
+
+      let symmetricKey = HKDF<SHA256>.deriveKey(
+        inputKeyMaterial: SymmetricKey(data: sharedSecret),
+        outputByteCount: 32
+      )
+      let sealedBox = try AES.GCM.SealedBox(combined: encryptedData)
+      let decrypted = try AES.GCM.open(sealedBox, using: symmetricKey)
+      return String(data: decrypted, encoding: .utf8)
+    }
+
     let algo = self.toiOSAlgo(algorithm: algoType!)
 
     guard let decrypted = SecKeyCreateDecryptedData(
@@ -420,11 +540,11 @@ public class DeviceCryptoModule: Module {
     }
 
     AsyncFunction("encrypt") { (alias: String, data: String, o: [String: Any]) -> String? in
-      return self.encrypt(alias: alias, data: data, o: o)
+      return try self.encrypt(alias: alias, data: data, o: o)
     }
 
     AsyncFunction("decrypt") { (alias: String, data: String, o: [String: Any]) -> String? in
-      return self.decrypt(alias: alias, data: data, o: o)
+      return try self.decrypt(alias: alias, data: data, o: o)
     }
   }
 }
